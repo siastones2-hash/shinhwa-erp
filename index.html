@@ -6,7 +6,7 @@
 <title>신화스퀘어 ERP v3</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif; background: #f0f4f8; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f4f8; -webkit-tap-highlight-color: transparent; }
 #root { min-height: 100vh; }
 input, select, textarea, button { font-family: inherit; font-size: 16px; }
 @media (max-width: 767px) {
@@ -591,7 +591,7 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B004",
-  "name": "(주) 미드밀",
+  "name": "빅마켓",
   "en": "",
   "country": "한국",
   "type": "국내",
@@ -603,7 +603,7 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B005",
-  "name": "오곱하기(29몰)",
+  "name": "(주) 미드밀",
   "en": "",
   "country": "한국",
   "type": "국내",
@@ -615,7 +615,7 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B006",
-  "name": "주식회사 더모",
+  "name": "오곱하기(29몰)",
   "en": "",
   "country": "한국",
   "type": "국내",
@@ -627,7 +627,7 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B007",
-  "name": "주식회사 더폴라리스",
+  "name": "주식회사 더모",
   "en": "",
   "country": "한국",
   "type": "국내",
@@ -639,7 +639,7 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B008",
-  "name": "4플레이, 니즈올",
+  "name": "㈜케이스키니",
   "en": "",
   "country": "한국",
   "type": "국내",
@@ -651,7 +651,7 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B009",
-  "name": "메타G",
+  "name": "주식회사 더폴라리스",
   "en": "",
   "country": "한국",
   "type": "국내",
@@ -663,7 +663,7 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B010",
-  "name": "다온(서기본가)",
+  "name": "예원상사",
   "en": "",
   "country": "한국",
   "type": "국내",
@@ -675,7 +675,7 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B011",
-  "name": "소브스",
+  "name": "4플레이, 니즈올",
   "en": "",
   "country": "한국",
   "type": "국내",
@@ -687,7 +687,7 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B012",
-  "name": "스마트스토어",
+  "name": "메타G",
   "en": "",
   "country": "한국",
   "type": "국내",
@@ -699,7 +699,7 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B013",
-  "name": "쿠팡",
+  "name": "큐큐랩",
   "en": "",
   "country": "한국",
   "type": "국내",
@@ -711,7 +711,7 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B014",
-  "name": "오픈마켓",
+  "name": "다온(서기본가)",
   "en": "",
   "country": "한국",
   "type": "국내",
@@ -723,6 +723,54 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }, {
   "id": "B015",
+  "name": "소브스",
+  "en": "",
+  "country": "한국",
+  "type": "국내",
+  "contact": "",
+  "email": "",
+  "phone": "",
+  "address": "",
+  "payment": "현금",
+  "bizNo": ""
+}, {
+  "id": "B016",
+  "name": "스마트스토어",
+  "en": "",
+  "country": "한국",
+  "type": "국내",
+  "contact": "",
+  "email": "",
+  "phone": "",
+  "address": "",
+  "payment": "현금",
+  "bizNo": ""
+}, {
+  "id": "B017",
+  "name": "쿠팡",
+  "en": "",
+  "country": "한국",
+  "type": "국내",
+  "contact": "",
+  "email": "",
+  "phone": "",
+  "address": "",
+  "payment": "현금",
+  "bizNo": ""
+}, {
+  "id": "B018",
+  "name": "오픈마켓",
+  "en": "",
+  "country": "한국",
+  "type": "국내",
+  "contact": "",
+  "email": "",
+  "phone": "",
+  "address": "",
+  "payment": "현금",
+  "bizNo": ""
+}, {
+  "id": "B019",
   "name": "네이버쇼핑",
   "en": "",
   "country": "한국",
@@ -735,82 +783,278 @@ const INIT_BUYERS = [{
   "bizNo": ""
 }];
 const INIT_PRICELIST = [{
-  "id": "PL1",
+  "id": "PL0001",
   "buyer": "㈜ 티어스",
   "buyerId": "B001",
   "product": "폭풍떡볶이 컵",
   "productId": "",
   "price": 1892
 }, {
-  "id": "PL2",
+  "id": "PL0002",
+  "buyer": "㈜ 티어스",
+  "buyerId": "B001",
+  "product": "택배비",
+  "productId": "",
+  "price": 3850
+}, {
+  "id": "PL0003",
   "buyer": "㈜초록마루",
   "buyerId": "B002",
   "product": "약과(50개)",
   "productId": "",
   "price": 30800
 }, {
-  "id": "PL3",
+  "id": "PL0004",
   "buyer": "주식회사 유니츠",
   "buyerId": "B003",
   "product": "폭풍떡볶이 컵",
   "productId": "",
   "price": 1892
 }, {
-  "id": "PL4",
+  "id": "PL0005",
+  "buyer": "주식회사 유니츠",
+  "buyerId": "B003",
+  "product": "썬키스트 후룻엔젤 4개입",
+  "productId": "",
+  "price": 2112
+}, {
+  "id": "PL0006",
+  "buyer": "주식회사 유니츠",
+  "buyerId": "B003",
+  "product": "썬키스트 비타엔젤",
+  "productId": "",
+  "price": 880
+}, {
+  "id": "PL0007",
+  "buyer": "주식회사 유니츠",
+  "buyerId": "B003",
+  "product": "뚜부칩 오리지널",
+  "productId": "",
+  "price": 1320
+}, {
+  "id": "PL0008",
+  "buyer": "주식회사 유니츠",
+  "buyerId": "B003",
+  "product": "뚜부칩 옥수수,어니언,떡볶이,김",
+  "productId": "",
+  "price": 1485
+}, {
+  "id": "PL0009",
+  "buyer": "주식회사 유니츠",
+  "buyerId": "B003",
+  "product": "택배비",
+  "productId": "",
+  "price": 3000
+}, {
+  "id": "PL0010",
   "buyer": "(주) 미드밀",
-  "buyerId": "B004",
+  "buyerId": "B005",
   "product": "폭풍떡볶이 컵",
   "productId": "",
   "price": 2200
 }, {
-  "id": "PL5",
-  "buyer": "오곱하기(29몰)",
+  "id": "PL0011",
+  "buyer": "(주) 미드밀",
   "buyerId": "B005",
-  "product": "폭풍떡볶이 컵",
+  "product": "택배비",
   "productId": "",
-  "price": 1892
+  "price": 3000
 }, {
-  "id": "PL6",
-  "buyer": "주식회사 더모",
+  "id": "PL0012",
+  "buyer": "오곱하기(29몰)",
   "buyerId": "B006",
   "product": "폭풍떡볶이 컵",
   "productId": "",
   "price": 1892
 }, {
-  "id": "PL7",
-  "buyer": "주식회사 더폴라리스",
+  "id": "PL0013",
+  "buyer": "오곱하기(29몰)",
+  "buyerId": "B006",
+  "product": "택배비",
+  "productId": "",
+  "price": 3000
+}, {
+  "id": "PL0014",
+  "buyer": "주식회사 더모",
   "buyerId": "B007",
+  "product": "폭풍떡볶이 컵",
+  "productId": "",
+  "price": 1892
+}, {
+  "id": "PL0015",
+  "buyer": "주식회사 더모",
+  "buyerId": "B007",
+  "product": "택배비",
+  "productId": "",
+  "price": 3000
+}, {
+  "id": "PL0016",
+  "buyer": "주식회사 더폴라리스",
+  "buyerId": "B009",
   "product": "폭풍떡볶이 컵",
   "productId": "",
   "price": 2000
 }, {
-  "id": "PL8",
-  "buyer": "4플레이, 니즈올",
-  "buyerId": "B008",
-  "product": "폭풍떡볶이 컵",
-  "productId": "",
-  "price": 1892
-}, {
-  "id": "PL9",
-  "buyer": "메타G",
+  "id": "PL0017",
+  "buyer": "주식회사 더폴라리스",
   "buyerId": "B009",
+  "product": "택배비",
+  "productId": "",
+  "price": 3000
+}, {
+  "id": "PL0018",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
   "product": "폭풍떡볶이 컵",
   "productId": "",
   "price": 1892
 }, {
-  "id": "PL10",
+  "id": "PL0019",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "제주 인생주스 한라봉 320ml",
+  "productId": "",
+  "price": 1540
+}, {
+  "id": "PL0020",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "제주 인생주스 천혜향 320ml",
+  "productId": "",
+  "price": 1540
+}, {
+  "id": "PL0021",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "제주 인생주스 레드향 320ml",
+  "productId": "",
+  "price": 1540
+}, {
+  "id": "PL0022",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "후룻메이트 자몽홍차 50g x 10p",
+  "productId": "",
+  "price": 4840
+}, {
+  "id": "PL0023",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "후룻메이트 블루베리히비스커스 50g x 10p",
+  "productId": "",
+  "price": 4840
+}, {
+  "id": "PL0024",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "후룻메이트 라임애플민트 50g x 10p",
+  "productId": "",
+  "price": 4840
+}, {
+  "id": "PL0025",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "과일컵 파인애플컵 113g x 4",
+  "productId": "",
+  "price": 3146
+}, {
+  "id": "PL0026",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "과일컵 망고컵 113g x 4",
+  "productId": "",
+  "price": 3146
+}, {
+  "id": "PL0027",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "후룻엔젤 감귤 75g",
+  "productId": "",
+  "price": 2324
+}, {
+  "id": "PL0028",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "후룻엔젤 파인 75g",
+  "productId": "",
+  "price": 2324
+}, {
+  "id": "PL0029",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "후룻엔젤 망고 75g",
+  "productId": "",
+  "price": 2324
+}, {
+  "id": "PL0030",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "비타엔젤 오렌지 185g",
+  "productId": "",
+  "price": 968
+}, {
+  "id": "PL0031",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "비타엔젤 레몬 185g",
+  "productId": "",
+  "price": 968
+}, {
+  "id": "PL0032",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "비타엔젤 자몽 185g",
+  "productId": "",
+  "price": 968
+}, {
+  "id": "PL0033",
+  "buyer": "4플레이, 니즈올",
+  "buyerId": "B011",
+  "product": "택배비",
+  "productId": "",
+  "price": 4000
+}, {
+  "id": "PL0034",
+  "buyer": "메타G",
+  "buyerId": "B012",
+  "product": "폭풍떡볶이 컵",
+  "productId": "",
+  "price": 1892
+}, {
+  "id": "PL0035",
+  "buyer": "메타G",
+  "buyerId": "B012",
+  "product": "택배비",
+  "productId": "",
+  "price": 3500
+}, {
+  "id": "PL0036",
   "buyer": "다온(서기본가)",
-  "buyerId": "B010",
+  "buyerId": "B014",
   "product": "폭풍떡볶이 컵",
   "productId": "",
   "price": 2200
 }, {
-  "id": "PL11",
+  "id": "PL0037",
+  "buyer": "다온(서기본가)",
+  "buyerId": "B014",
+  "product": "택배비",
+  "productId": "",
+  "price": 3300
+}, {
+  "id": "PL0038",
   "buyer": "소브스",
-  "buyerId": "B011",
+  "buyerId": "B015",
   "product": "폭풍떡볶이 컵",
   "productId": "",
   "price": 1720
+}, {
+  "id": "PL0039",
+  "buyer": "소브스",
+  "buyerId": "B015",
+  "product": "택배비",
+  "productId": "",
+  "price": 3000
 }];
 const COUNTRIES = ['한국', '미국', '일본', '베트남', '몽골', '우즈베키스탄', '싱가포르', '대만', '필리핀', '호주', 'UAE', '독일', '중국', '태국', '인도네시아', '말레이시아'];
 const FLAGS = {
@@ -1392,23 +1636,9 @@ function App() {
               showToast(`✅ 상품 ${db.length}개 자동 로드!`, '#15803d');
               // Supabase에도 저장
               for (const prod of db) {
-                await sb.upsert('erp_products', {
-                  id: prod.id,
-                  ko: prod.ko,
-                  en: prod.en || '',
-                  brand: prod.brand || '',
-                  cat: prod.cat || '',
-                  sp: prod.sp || '',
-                  consumer: prod.consumer || 0,
-                  cost: prod.cost || 0,
-                  sale: prod.sale || 0,
-                  fob: prod.fob || 0,
-                  ship: prod.ship || 0,
-                  inbox: prod.inbox || 1,
-                  safe: prod.safe || 0,
-                  img: prod.img || '',
-                  status: 'active'
-                });
+                try {
+                  await sb.upsert('erp_products', toDB.product(prod));
+                } catch (e) {}
               }
             } catch (e) {
               console.error('상품 자동로드 실패:', e);
@@ -1421,19 +1651,9 @@ function App() {
           // 거래처 없으면 INIT_BUYERS 자동 로드
           setBuyers(INIT_BUYERS);
           for (const buyer of INIT_BUYERS) {
-            sb.upsert('erp_buyers', {
-              id: buyer.id,
-              name: buyer.name,
-              en: buyer.en || '',
-              country: buyer.country || '한국',
-              type: buyer.type || '국내',
-              contact: buyer.contact || '',
-              email: buyer.email || '',
-              phone: buyer.phone || '',
-              address: buyer.address || '',
-              payment: buyer.payment || '현금',
-              biz_no: buyer.bizNo || ''
-            }).catch(() => {});
+            try {
+              await sb.upsert('erp_buyers', toDB.buyer(buyer));
+            } catch (e) {}
           }
         }
         if (st.length > 0) setStocks(st.map(fromDB.stock));
