@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>신화스퀘어 ERP</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1451,6 +1451,9 @@ function App() {
     icon: '👥',
     label: '직원관리'
   }] : [])];
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const bottomMenus = visibleMenus.slice(0, 5);
   return /*#__PURE__*/React.createElement(AuthCtx.Provider, {
     value: ctx
   }, /*#__PURE__*/React.createElement("div", {
@@ -1460,14 +1463,29 @@ function App() {
       minHeight: '100vh',
       fontSize: 14
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("style", null, `
+   @media (max-width: 767px) {
+     .pc-sidebar { display: none !important; }
+     .pc-header-name { display: none !important; }
+     .pc-header-btns { display: none !important; }
+     .mobile-bottom-nav { display: flex !important; }
+     .mobile-menu-btn { display: flex !important; }
+     .main-content { padding: 12px !important; padding-bottom: 70px !important; }
+     .pc-grid { grid-template-columns: 1fr !important; }
+   }
+   @media (min-width: 768px) {
+     .mobile-bottom-nav { display: none !important; }
+     .mobile-menu-btn { display: none !important; }
+     .mobile-overlay { display: none !important; }
+   }
+ `), /*#__PURE__*/React.createElement("div", {
     style: {
       background: '#0f172a',
       height: 52,
       display: 'flex',
       alignItems: 'center',
-      padding: '0 20px',
-      gap: 12,
+      padding: '0 16px',
+      gap: 10,
       position: 'sticky',
       top: 0,
       zIndex: 100
@@ -1483,7 +1501,8 @@ function App() {
       justifyContent: 'center',
       color: '#fff',
       fontWeight: 800,
-      fontSize: 10
+      fontSize: 10,
+      flexShrink: 0
     }
   }, "SHI"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1512,13 +1531,20 @@ function App() {
       fontWeight: 600,
       cursor: 'pointer'
     }
-  }, "\u23F3 ", pendingCount, "\uAC74"), /*#__PURE__*/React.createElement("span", {
+  }, "\u23F3 ", pendingCount), /*#__PURE__*/React.createElement("span", {
+    className: "pc-header-name",
     style: {
       color: '#fff',
       fontSize: 12,
       fontWeight: 600
     }
-  }, user.name), /*#__PURE__*/React.createElement(Btn, {
+  }, user.name), /*#__PURE__*/React.createElement("div", {
+    className: "pc-header-btns",
+    style: {
+      display: 'flex',
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
     onClick: () => setPage('mypage'),
     color: "outline",
     sm: true,
@@ -1534,13 +1560,111 @@ function App() {
       borderColor: '#334155',
       color: '#94a3b8'
     }
-  }, "\uB85C\uADF8\uC544\uC6C3")), /*#__PURE__*/React.createElement("div", {
+  }, "\uB85C\uADF8\uC544\uC6C3")), /*#__PURE__*/React.createElement("button", {
+    className: "mobile-menu-btn",
+    onClick: () => setMobileMenuOpen(true),
+    style: {
+      display: 'none',
+      background: 'none',
+      border: 'none',
+      color: '#fff',
+      fontSize: 22,
+      cursor: 'pointer',
+      padding: '4px 6px'
+    }
+  }, "\u2630")), mobileMenuOpen && /*#__PURE__*/React.createElement("div", {
+    className: "mobile-overlay",
+    onClick: () => setMobileMenuOpen(false),
+    style: {
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,.5)',
+      zIndex: 200,
+      display: 'flex'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    style: {
+      width: 260,
+      background: '#fff',
+      height: '100%',
+      overflowY: 'auto',
+      padding: '16px 0'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '0 16px 12px',
+      borderBottom: '1px solid #e2e8f0'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, user.name, "\uB2D8"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      setPage('mypage');
+      setMobileMenuOpen(false);
+    },
+    color: "outline",
+    sm: true
+  }, "\u2699\uFE0F"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      logout();
+      setMobileMenuOpen(false);
+    },
+    color: "outline",
+    sm: true
+  }, "\uB85C\uADF8\uC544\uC6C3"))), visibleMenus.map(n => /*#__PURE__*/React.createElement("div", {
+    key: n.id,
+    onClick: () => {
+      setPage(n.id);
+      setMobileMenuOpen(false);
+    },
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      padding: '12px 16px',
+      cursor: 'pointer',
+      fontSize: 14,
+      color: page === n.id ? '#1d4ed8' : '#475569',
+      background: page === n.id ? '#eff6ff' : 'transparent',
+      borderLeft: page === n.id ? '3px solid #1d4ed8' : '3px solid transparent',
+      fontWeight: page === n.id ? 600 : 400
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16,
+      width: 20,
+      textAlign: 'center'
+    }
+  }, n.icon), n.label, n.id === 'approval' && pendingCount > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: 'auto',
+      background: '#dc2626',
+      color: '#fff',
+      borderRadius: 10,
+      padding: '2px 7px',
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, pendingCount))))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: '180px 1fr',
       minHeight: 'calc(100vh - 52px)'
     }
   }, /*#__PURE__*/React.createElement("nav", {
+    className: "pc-sidebar",
     style: {
       background: '#fff',
       borderRight: '1px solid #e2e8f0',
@@ -1579,23 +1703,82 @@ function App() {
       fontWeight: 700
     }
   }, pendingCount)))), /*#__PURE__*/React.createElement("main", {
+    className: "main-content",
     style: {
       overflow: 'auto',
       padding: 20
     }
-  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'approval' && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CbmPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && user.role === 'ceo' && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null))), toast && /*#__PURE__*/React.createElement("div", {
+  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'approval' && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CbmPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && user.role === 'ceo' && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null))), /*#__PURE__*/React.createElement("div", {
+    className: "mobile-bottom-nav",
+    style: {
+      display: 'none',
+      position: 'fixed',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      background: '#fff',
+      borderTop: '1px solid #e2e8f0',
+      zIndex: 150,
+      height: 58
+    }
+  }, bottomMenus.slice(0, 4).map(n => /*#__PURE__*/React.createElement("div", {
+    key: n.id,
+    onClick: () => setPage(n.id),
+    style: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 2,
+      cursor: 'pointer',
+      color: page === n.id ? '#1d4ed8' : '#94a3b8',
+      paddingTop: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, n.icon), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 9,
+      fontWeight: page === n.id ? 700 : 400
+    }
+  }, n.label))), /*#__PURE__*/React.createElement("div", {
+    onClick: () => setMobileMenuOpen(true),
+    style: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 2,
+      cursor: 'pointer',
+      color: '#94a3b8',
+      paddingTop: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, "\u2630"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 9
+    }
+  }, "\uB354\uBCF4\uAE30"))), toast && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'fixed',
-      bottom: 22,
-      right: 22,
+      bottom: 70,
+      right: 16,
       background: toast.c,
       color: '#fff',
-      padding: '10px 18px',
+      padding: '10px 16px',
       borderRadius: 10,
       fontSize: 13,
       fontWeight: 500,
       zIndex: 9999,
-      boxShadow: '0 4px 16px rgba(0,0,0,.2)'
+      boxShadow: '0 4px 16px rgba(0,0,0,.2)',
+      maxWidth: '80vw'
     }
   }, toast.msg)));
 }
@@ -3934,241 +4117,7 @@ function ProductSelect({
       fontSize: 10,
       color: '#94a3b8'
     }
-  }, "\uC6D0\uAC00 ", won(p.cost)))))), stockDetail && (() => {
-    const cur = getStock(stockDetail.id);
-    const history = [...stocks].filter(s => s.productId === stockDetail.id).reverse().slice(0, 15);
-    const tin = stocks.filter(s => s.productId === stockDetail.id && s.type === 'in').reduce((a, s) => a + s.qty, 0);
-    const tout = stocks.filter(s => s.productId === stockDetail.id && s.type === 'out').reduce((a, s) => a + s.qty, 0);
-    const status = cur <= 0 ? '재고없음' : cur <= (stockDetail.safe || 0) ? '부족' : '정상';
-    return /*#__PURE__*/React.createElement("div", {
-      onClick: () => setStockDetail(null),
-      style: {
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15,23,42,.55)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 300,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      onClick: e => e.stopPropagation(),
-      style: {
-        background: '#fff',
-        borderRadius: 16,
-        width: '100%',
-        maxWidth: 580,
-        maxHeight: '90vh',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 24px 60px rgba(0,0,0,.25)',
-        overflow: 'hidden'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        background: 'linear-gradient(135deg,#0f172a,#1e3a5f)',
-        padding: '16px 20px',
-        color: '#fff'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start'
-      }
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: '#93c5fd',
-        marginBottom: 3
-      }
-    }, stockDetail.id, " \xB7 ", stockDetail.brand || '—'), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 16,
-        fontWeight: 700
-      }
-    }, stockDetail.ko), stockDetail.en && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: '#94a3b8',
-        marginTop: 2
-      }
-    }, stockDetail.en)), /*#__PURE__*/React.createElement("button", {
-      onClick: () => setStockDetail(null),
-      style: {
-        background: 'rgba(255,255,255,.15)',
-        border: 'none',
-        borderRadius: 8,
-        color: '#fff',
-        cursor: 'pointer',
-        padding: '6px 10px',
-        fontSize: 14
-      }
-    }, "\u2715")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 1fr 1fr',
-        gap: 8,
-        marginTop: 14
-      }
-    }, [{
-      label: '현재고',
-      value: cur,
-      color: cur <= 0 ? '#fca5a5' : cur <= (stockDetail.safe || 0) ? '#fcd34d' : '#86efac',
-      big: true
-    }, {
-      label: '안전재고',
-      value: stockDetail.safe || 0,
-      color: '#93c5fd'
-    }, {
-      label: '총 입고',
-      value: tin,
-      color: '#93c5fd'
-    }, {
-      label: '총 출고',
-      value: tout,
-      color: '#fca5a5'
-    }].map((s, i) => /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        background: 'rgba(255,255,255,.1)',
-        borderRadius: 8,
-        padding: '8px 10px',
-        textAlign: 'center'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 9,
-        color: 'rgba(255,255,255,.6)',
-        marginBottom: 3
-      }
-    }, s.label), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontFamily: 'monospace',
-        fontWeight: 700,
-        fontSize: s.big ? 20 : 14,
-        color: s.color
-      }
-    }, s.value))))), editable && /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 8,
-        padding: '12px 16px',
-        borderBottom: '1px solid #e2e8f0',
-        background: '#f8fafc'
-      }
-    }, /*#__PURE__*/React.createElement(Btn, {
-      onClick: () => {
-        setStockDetail(null);
-        setForm({
-          date: todayStr(),
-          productId: stockDetail.id,
-          qty: '',
-          price: String(stockDetail.cost || ''),
-          partner: '',
-          note: ''
-        });
-        setModal('in');
-      },
-      color: "blue",
-      style: {
-        justifyContent: 'center'
-      }
-    }, "\uD83D\uDCE5 \uC774 \uC0C1\uD488 \uC785\uACE0 \uB4F1\uB85D"), /*#__PURE__*/React.createElement(Btn, {
-      onClick: () => {
-        setStockDetail(null);
-        setForm({
-          date: todayStr(),
-          productId: stockDetail.id,
-          qty: '',
-          price: '',
-          partner: '',
-          note: ''
-        });
-        setModal('out');
-      },
-      color: "green",
-      style: {
-        justifyContent: 'center',
-        opacity: cur <= 0 ? .5 : 1
-      },
-      disabled: cur <= 0
-    }, "\uD83D\uDCE4 \uC774 \uC0C1\uD488 \uCD9C\uACE0 \uB4F1\uB85D", cur <= 0 ? ' (재고없음)' : '')), /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1,
-        overflowY: 'auto'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '10px 16px 6px',
-        fontSize: 12,
-        fontWeight: 600,
-        color: '#475569'
-      }
-    }, "\uD83D\uDCCB \uCD5C\uADFC \uC785\uCD9C\uACE0 \uC774\uB825"), history.length === 0 ? /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: 24,
-        textAlign: 'center',
-        color: '#94a3b8',
-        fontSize: 12
-      }
-    }, "\uC544\uC9C1 \uC785\uCD9C\uACE0 \uB0B4\uC5ED\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.", /*#__PURE__*/React.createElement("br", null), "\uC704 \uBC84\uD2BC\uC73C\uB85C \uC785\uACE0\uB97C \uB4F1\uB85D\uD574\uBCF4\uC138\uC694!") : /*#__PURE__*/React.createElement("table", {
-      style: {
-        width: '100%',
-        borderCollapse: 'collapse'
-      }
-    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
-      style: {
-        background: '#f8fafc'
-      }
-    }, ['날짜', '구분', '수량', '단가', '거래처'].map((h, i) => /*#__PURE__*/React.createElement("th", {
-      key: i,
-      style: {
-        ...S.th,
-        padding: '6px 12px'
-      }
-    }, h)))), /*#__PURE__*/React.createElement("tbody", null, history.map((s, i) => /*#__PURE__*/React.createElement("tr", {
-      key: s.id,
-      style: {
-        background: i % 2 ? '#fafbff' : '#fff'
-      }
-    }, /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, s.date), /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, /*#__PURE__*/React.createElement(Tag, {
-      c: s.type === 'in' ? 'blue' : 'green'
-    }, s.type === 'in' ? '📥 입고' : '📤 출고')), /*#__PURE__*/React.createElement("td", {
-      style: {
-        ...S.td,
-        fontFamily: 'monospace',
-        fontWeight: 700,
-        color: s.type === 'in' ? '#1d4ed8' : '#ea580c'
-      }
-    }, s.type === 'in' ? '+' : '-', s.qty), /*#__PURE__*/React.createElement("td", {
-      style: {
-        ...S.td,
-        fontFamily: 'monospace'
-      }
-    }, s.price ? won(s.price) : '—'), /*#__PURE__*/React.createElement("td", {
-      style: {
-        ...S.td,
-        fontSize: 11
-      }
-    }, s.partner || '—')))))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '10px 16px',
-        borderTop: '1px solid #e2e8f0',
-        textAlign: 'right'
-      }
-    }, /*#__PURE__*/React.createElement(Btn, {
-      onClick: () => setStockDetail(null),
-      color: "outline"
-    }, "\uB2EB\uAE30"))));
-  })());
+  }, "\uC6D0\uAC00 ", won(p.cost)))))));
 }
 function SalesPage() {
   const {
@@ -8331,6 +8280,570 @@ function MyPage() {
       justifyContent: 'center'
     }
   }, "\uD83D\uDD12 \uBE44\uBC00\uBC88\uD638 \uBCC0\uACBD")))));
+}
+function UsersPage() {
+  const {
+    users,
+    setUsers,
+    showToast
+  } = useAuth();
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'staff',
+    permissions: {},
+    active: true
+  });
+  const MENUS2 = [{
+    id: 'products',
+    label: '상품/단가'
+  }, {
+    id: 'stock',
+    label: '재고관리'
+  }, {
+    id: 'sales',
+    label: '매출관리'
+  }, {
+    id: 'purchase',
+    label: '매입관리'
+  }, {
+    id: 'receipt',
+    label: '수금관리'
+  }, {
+    id: 'payment',
+    label: '지급관리'
+  }, {
+    id: 'tax',
+    label: '세금계산서'
+  }, {
+    id: 'quote',
+    label: '견적서/PI'
+  }, {
+    id: 'invoice',
+    label: '인보이스'
+  }, {
+    id: 'buyers',
+    label: '거래처'
+  }, {
+    id: 'pricelist',
+    label: '거래처단가'
+  }, {
+    id: 'report',
+    label: '리포트'
+  }, {
+    id: 'schedule',
+    label: '스케줄'
+  }];
+  const save = () => {
+    if (!form.name || !form.email || !form.password) {
+      showToast('이름, 이메일, 비밀번호를 입력하세요', '#dc2626');
+      return;
+    }
+    if (users.find(u => u.email === form.email && u.id !== form.id)) {
+      showToast('이미 존재하는 이메일', '#dc2626');
+      return;
+    }
+    if (form.id) {
+      setUsers(prev => prev.map(u => u.id === form.id ? {
+        ...form
+      } : u));
+      showToast('✅ 수정 완료!');
+    } else {
+      setUsers(prev => [...prev, {
+        ...form,
+        id: 'U' + Date.now()
+      }]);
+      showToast('✅ 직원 추가!');
+    }
+    setModal(false);
+  };
+  const togglePerm = (uid, menuId, type) => {
+    setUsers(prev => prev.map(u => {
+      if (u.id !== uid) return u;
+      const p = {
+        ...u.permissions
+      };
+      if (!p[menuId]) p[menuId] = {
+        view: false,
+        edit: false
+      };
+      p[menuId] = {
+        ...p[menuId],
+        [type]: !p[menuId][type]
+      };
+      return {
+        ...u,
+        permissions: p
+      };
+    }));
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 700
+    }
+  }, "\uD83D\uDC65 \uC9C1\uC6D0\uAD00\uB9AC"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      setForm({
+        name: '',
+        email: '',
+        password: '',
+        role: 'staff',
+        permissions: {},
+        active: true
+      });
+      setModal(true);
+    }
+  }, "\u271A \uC9C1\uC6D0 \uCD94\uAC00")), users.filter(u => u.role === 'staff').map(u => /*#__PURE__*/React.createElement(Card, {
+    key: u.id,
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '12px 16px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      borderBottom: '1px solid #e2e8f0'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 36,
+      height: 36,
+      background: 'linear-gradient(135deg,#2563eb,#7c3aed)',
+      borderRadius: 10,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#fff',
+      fontWeight: 700
+    }
+  }, u.name?.[0]), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700
+    }
+  }, u.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#94a3b8'
+    }
+  }, u.email)), /*#__PURE__*/React.createElement(Tag, {
+    c: u.active ? 'green' : 'gray'
+  }, u.active ? '활성' : '비활성'), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      setForm({
+        ...u
+      });
+      setModal(true);
+    },
+    color: "outline",
+    sm: true
+  }, "\uC218\uC815"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      if (!confirmDel('직원을 삭제하시겠습니까?')) return;
+      setUsers(prev => prev.filter(x => x.id !== u.id));
+    },
+    color: "outline",
+    sm: true
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: '#475569',
+      marginBottom: 8
+    }
+  }, "\uD83D\uDD12 \uBA54\uB274 \uAD8C\uD55C"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))',
+      gap: 6
+    }
+  }, MENUS2.map(m => /*#__PURE__*/React.createElement("div", {
+    key: m.id,
+    style: {
+      background: '#f8fafc',
+      borderRadius: 8,
+      padding: '6px 10px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      marginBottom: 4
+    }
+  }, m.label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 3,
+      cursor: 'pointer'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: u.permissions[m.id]?.view || false,
+    onChange: () => togglePerm(u.id, m.id, 'view')
+  }), "\uC870\uD68C"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 3,
+      cursor: 'pointer'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: u.permissions[m.id]?.edit || false,
+    onChange: () => togglePerm(u.id, m.id, 'edit')
+  }), "\uD3B8\uC9D1")))))))), modal && /*#__PURE__*/React.createElement(Modal, {
+    title: form.id ? '직원 수정' : '직원 추가',
+    onClose: () => setModal(false)
+  }, /*#__PURE__*/React.createElement(Grid2, null, /*#__PURE__*/React.createElement(FG, {
+    label: "\uC774\uB984 *"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.name,
+    onChange: v => setForm(f => ({
+      ...f,
+      name: v
+    })),
+    placeholder: "\uD64D\uAE38\uB3D9"
+  })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uC774\uBA54\uC77C *"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.email,
+    onChange: v => setForm(f => ({
+      ...f,
+      email: v
+    })),
+    placeholder: "staff@shinhwa.com"
+  })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uBE44\uBC00\uBC88\uD638 *"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.password,
+    onChange: v => setForm(f => ({
+      ...f,
+      password: v
+    })),
+    placeholder: "\uBE44\uBC00\uBC88\uD638"
+  })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uC0C1\uD0DC"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    value: form.active ? 'active' : 'inactive',
+    onChange: v => setForm(f => ({
+      ...f,
+      active: v === 'active'
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "active"
+  }, "\uD65C\uC131"), /*#__PURE__*/React.createElement("option", {
+    value: "inactive"
+  }, "\uBE44\uD65C\uC131")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      justifyContent: 'flex-end',
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setModal(false),
+    color: "outline"
+  }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: save
+  }, "\u2705 \uC800\uC7A5"))));
+}
+function ApprovalPage() {
+  const {
+    approvals,
+    setApprovals,
+    sales,
+    setSales,
+    showToast,
+    user
+  } = useAuth();
+  const pending = approvals.filter(a => a.status === '대기');
+  const done = approvals.filter(a => a.status !== '대기');
+  const approve = a => {
+    if (a.type === 'sales_add') {
+      setSales(prev => [...prev, a.data]);
+    }
+    setApprovals(prev => prev.map(x => x.id === a.id ? {
+      ...x,
+      status: '승인',
+      approvedBy: user.name,
+      approvedAt: new Date().toISOString().slice(0, 10)
+    } : x));
+    showToast('✅ 승인 완료!', '#15803d');
+  };
+  const reject = a => {
+    setApprovals(prev => prev.map(x => x.id === a.id ? {
+      ...x,
+      status: '반려',
+      approvedBy: user.name
+    } : x));
+    showToast('🚫 반려됨', '#dc2626');
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 700,
+      marginBottom: 16
+    }
+  }, "\u23F3 \uC2B9\uC778\uAD00\uB9AC"), pending.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 24,
+      textAlign: 'center',
+      color: '#94a3b8'
+    }
+  }, "\uB300\uAE30 \uC911\uC778 \uC2B9\uC778 \uC694\uCCAD\uC774 \uC5C6\uC2B5\uB2C8\uB2E4"), pending.map(a => /*#__PURE__*/React.createElement(Card, {
+    key: a.id,
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '12px 16px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700
+    }
+  }, a.title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#94a3b8'
+    }
+  }, a.requester, " \xB7 ", a.requestedAt)), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => approve(a),
+    color: "green",
+    sm: true
+  }, "\u2705 \uC2B9\uC778"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => reject(a),
+    color: "red",
+    sm: true
+  }, "\uD83D\uDEAB \uBC18\uB824")))), done.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: '#94a3b8',
+      margin: '16px 0 8px'
+    }
+  }, "\uCC98\uB9AC \uC644\uB8CC"), done.slice(0, 10).map(a => /*#__PURE__*/React.createElement("div", {
+    key: a.id,
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: '8px 12px',
+      borderBottom: '1px solid #f1f5f9',
+      fontSize: 12
+    }
+  }, /*#__PURE__*/React.createElement(Tag, {
+    c: a.status === '승인' ? 'green' : 'red'
+  }, a.status), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, a.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#94a3b8'
+    }
+  }, a.approvedBy)))));
+}
+function CbmPage() {
+  const [items, setItems] = useState([{
+    id: 1,
+    name: '',
+    qty: 1,
+    length: 0,
+    width: 0,
+    height: 0
+  }]);
+  const addRow = () => setItems(prev => [...prev, {
+    id: Date.now(),
+    name: '',
+    qty: 1,
+    length: 0,
+    width: 0,
+    height: 0
+  }]);
+  const upd = (id, k, v) => setItems(prev => prev.map(r => r.id === id ? {
+    ...r,
+    [k]: k === 'name' ? v : +v || 0
+  } : r));
+  const total = items.reduce((a, r) => a + r.length / 100 * (r.width / 100) * (r.height / 100) * r.qty, 0);
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 700,
+      marginBottom: 16
+    }
+  }, "\uD83D\uDCE6 CBM \uACC4\uC0B0\uAE30"), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      overflowX: 'auto'
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: '100%',
+      borderCollapse: 'collapse'
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['상품명', '수량', '가로(cm)', '세로(cm)', '높이(cm)', 'CBM', ''].map((h, i) => /*#__PURE__*/React.createElement("th", {
+    key: i,
+    style: S.th
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, items.map((r, i) => /*#__PURE__*/React.createElement("tr", {
+    key: r.id,
+    style: {
+      background: i % 2 ? '#fafbff' : '#fff'
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    value: r.name,
+    onChange: e => upd(r.id, 'name', e.target.value),
+    style: {
+      ...inp2style,
+      width: 120
+    },
+    placeholder: "\uC0C1\uD488\uBA85"
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: r.qty,
+    onChange: e => upd(r.id, 'qty', e.target.value),
+    style: {
+      ...inp2style,
+      width: 60,
+      textAlign: 'center'
+    }
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: r.length,
+    onChange: e => upd(r.id, 'length', e.target.value),
+    style: {
+      ...inp2style,
+      width: 80,
+      textAlign: 'right'
+    }
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: r.width,
+    onChange: e => upd(r.id, 'width', e.target.value),
+    style: {
+      ...inp2style,
+      width: 80,
+      textAlign: 'right'
+    }
+  })), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: r.height,
+    onChange: e => upd(r.id, 'height', e.target.value),
+    style: {
+      ...inp2style,
+      width: 80,
+      textAlign: 'right'
+    }
+  })), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      fontFamily: 'monospace',
+      fontWeight: 700,
+      color: '#1d4ed8'
+    }
+  }, (r.length / 100 * (r.width / 100) * (r.height / 100) * r.qty).toFixed(4)), /*#__PURE__*/React.createElement("td", {
+    style: S.td
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setItems(p => p.filter(x => x.id !== r.id)),
+    color: "outline",
+    sm: true
+  }, "\u2715"))))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '10px 16px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderTop: '1px solid #e2e8f0'
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: addRow,
+    color: "outline",
+    sm: true
+  }, "+ \uD589 \uCD94\uAC00"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, "\uCD1D CBM: ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#1d4ed8',
+      fontFamily: 'monospace'
+    }
+  }, total.toFixed(4), " m\xB3")))));
+}
+function BizReportPage() {
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 700,
+      marginBottom: 16
+    }
+  }, "\uD83D\uDCCA \uC0AC\uC5C5\uBCF4\uACE0\uC11C"), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 40,
+      textAlign: 'center',
+      color: '#94a3b8'
+    }
+  }, "\uC900\uBE44 \uC911\uC785\uB2C8\uB2E4")));
+}
+function AnnexPage() {
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 700,
+      marginBottom: 16
+    }
+  }, "\uD83D\uDCCE \uBD80\uC18D\uC11C\uB958"), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 40,
+      textAlign: 'center',
+      color: '#94a3b8'
+    }
+  }, "\uC900\uBE44 \uC911\uC785\uB2C8\uB2E4")));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
 </script>
