@@ -2850,11 +2850,16 @@ function ProductsPage() {
     exchangeRate,
     setExchangeRate,
     syncDB,
-    user
+    user,
+    getStock,
+    sales
   } = useAuth();
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
+  const [priceFilter, setPriceFilter] = useState(''); // 가격대 필터
+  const [stockFilter, setStockFilter] = useState(''); // 재고 필터
+  const [sortBy, setSortBy] = useState('default'); // 정렬
   const [modal, setModal] = useState(false);
   const [detailProduct, setDetailProduct] = useState(null);
   const [importModal, setImportModal] = useState(false);
@@ -2874,12 +2879,31 @@ function ProductsPage() {
     safe: ''
   });
   const editable = canEdit('products');
-  const filtered = products.filter(p => {
-    const matchSearch = !search || (p.ko || '').includes(search) || (p.en || '').toLowerCase().includes(search.toLowerCase()) || (p.brand || '').includes(search) || (p.id || '').includes(search);
-    const matchCat = !catFilter || (p.cat || '').includes(catFilter);
-    const matchBrand = !brandFilter || p.brand === brandFilter;
-    return matchSearch && matchCat && matchBrand;
-  });
+  const filtered = (() => {
+    let list = products.filter(p => {
+      const matchSearch = !search || (p.ko || '').includes(search) || (p.en || '').toLowerCase().includes(search.toLowerCase()) || (p.brand || '').includes(search) || (p.id || '').includes(search) || (p.sp || '').includes(search);
+      const matchCat = !catFilter || (p.cat || '').includes(catFilter);
+      const matchBrand = !brandFilter || p.brand === brandFilter;
+      const matchPrice = !priceFilter || (priceFilter === '~5000' ? (p.consumer || 0) <= 5000 : priceFilter === '5001~20000' ? (p.consumer || 0) > 5000 && (p.consumer || 0) <= 20000 : priceFilter === '20001~50000' ? (p.consumer || 0) > 20000 && (p.consumer || 0) <= 50000 : priceFilter === '50001~' ? (p.consumer || 0) > 50000 : true);
+      const cur = getStock(p.id);
+      const matchStock = !stockFilter || (stockFilter === '있음' ? cur > 0 : stockFilter === '없음' ? cur <= 0 : stockFilter === '부족' ? cur > 0 && cur <= (p.safe || 0) : true);
+      return matchSearch && matchCat && matchBrand && matchPrice && matchStock;
+    });
+    if (sortBy === 'name') list = [...list].sort((a, b) => (a.ko || '').localeCompare(b.ko || ''));else if (sortBy === 'code') list = [...list].sort((a, b) => (a.id || '').localeCompare(b.id || ''));else if (sortBy === 'price_asc') list = [...list].sort((a, b) => (a.consumer || 0) - (b.consumer || 0));else if (sortBy === 'price_desc') list = [...list].sort((a, b) => (b.consumer || 0) - (a.consumer || 0));else if (sortBy === 'cost_asc') list = [...list].sort((a, b) => (a.cost || 0) - (b.cost || 0));else if (sortBy === 'cost_desc') list = [...list].sort((a, b) => (b.cost || 0) - (a.cost || 0));else if (sortBy === 'fob_desc') list = [...list].sort((a, b) => (b.fob || 0) - (a.fob || 0));else if (sortBy === 'brand') list = [...list].sort((a, b) => (a.brand || '').localeCompare(b.brand || ''));else if (sortBy === 'stock_desc') list = [...list].sort((a, b) => getStock(b.id) - getStock(a.id));else if (sortBy === 'stock_asc') list = [...list].sort((a, b) => getStock(a.id) - getStock(b.id));else if (sortBy === 'margin_desc') list = [...list].sort((a, b) => {
+      const mA = a.consumer > 0 ? Math.round((1 - (a.cost || 0) / a.consumer) * 100) : 0;
+      const mB = b.consumer > 0 ? Math.round((1 - (b.cost || 0) / b.consumer) * 100) : 0;
+      return mB - mA;
+    });else if (sortBy === 'sales_desc') list = [...list].sort((a, b) => {
+      const sA = sales.filter(s => s.productId === a.id || s.item === a.ko).reduce((x, s) => x + (s.qty || 1), 0);
+      const sB = sales.filter(s => s.productId === b.id || s.item === b.ko).reduce((x, s) => x + (s.qty || 1), 0);
+      return sB - sA;
+    });else if (sortBy === 'sales_asc') list = [...list].sort((a, b) => {
+      const sA = sales.filter(s => s.productId === a.id || s.item === a.ko).reduce((x, s) => x + (s.qty || 1), 0);
+      const sB = sales.filter(s => s.productId === b.id || s.item === b.ko).reduce((x, s) => x + (s.qty || 1), 0);
+      return sA - sB;
+    });
+    return list;
+  })();
   const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
   const cats = [...new Set(products.map(p => (p.cat || '').split(' ')[0]).filter(Boolean))].sort();
   const save = () => {
@@ -3116,7 +3140,37 @@ function ProductsPage() {
     setImportModal(false);
     setImportPreview([]);
   };
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement("div", null, products.length <= 5 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: '#fef3c7',
+      border: '1.5px solid #fcd34d',
+      borderRadius: 10,
+      padding: '10px 14px',
+      marginBottom: 12,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16
+    }
+  }, "\u26A0\uFE0F"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 12,
+      color: '#92400e'
+    }
+  }, "\uC0C1\uD488 DB\uAC00 \uBE44\uC5B4\uC788\uC2B5\uB2C8\uB2E4!"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#92400e'
+    }
+  }, "\uC544\uB798 \"\uD83D\uDCE6 \uC2E0\uD654 \uC0C1\uD488DB \uCD08\uAE30\uD654\" \uBC84\uD2BC\uC744 \uD074\uB9AD\uD574 1,139\uAC1C \uC0C1\uD488\uC744 \uBD88\uB7EC\uC624\uC138\uC694."))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       justifyContent: 'space-between',
@@ -3137,7 +3191,20 @@ function ProductsPage() {
       gap: 4,
       flexWrap: 'wrap'
     }
-  }, "\uC804\uCCB4 ", products.length, "\uAC1C \xB7 \uAC80\uC0C9\uACB0\uACFC ", filtered.length, "\uAC1C \xB7", /*#__PURE__*/React.createElement("span", {
+  }, "\uC804\uCCB4 ", products.length, "\uAC1C \xB7 ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: filtered.length < products.length ? '#1d4ed8' : '#94a3b8',
+      fontWeight: filtered.length < products.length ? 600 : 400
+    }
+  }, "\uAC80\uC0C9\uACB0\uACFC ", filtered.length, "\uAC1C"), catFilter && /*#__PURE__*/React.createElement(Tag, {
+    c: "blue"
+  }, catFilter), brandFilter && /*#__PURE__*/React.createElement(Tag, {
+    c: "purple"
+  }, brandFilter), priceFilter && /*#__PURE__*/React.createElement(Tag, {
+    c: "orange"
+  }, "\uAC00\uACA9\uD544\uD130"), stockFilter && /*#__PURE__*/React.createElement(Tag, {
+    c: stockFilter === '없음' ? 'red' : 'green'
+  }, stockFilter), "\xB7", /*#__PURE__*/React.createElement("span", {
     style: {
       color: '#1d4ed8',
       fontWeight: 600
@@ -3242,7 +3309,7 @@ function ProductsPage() {
   }, /*#__PURE__*/React.createElement("input", {
     value: search,
     onChange: e => setSearch(e.target.value),
-    placeholder: "\uD83D\uDD0D \uC0C1\uD488\uBA85(\uD55C/\uC601),\uBE0C\uB79C\uB4DC,\uCF54\uB4DC \uAC80\uC0C9...",
+    placeholder: "\uD83D\uDD0D \uC0C1\uD488\uBA85(\uD55C/\uC601),\uBE0C\uB79C\uB4DC,\uCF54\uB4DC,\uADDC\uACA9 \uAC80\uC0C9...",
     style: {
       ...inp,
       flex: 2,
@@ -3274,11 +3341,84 @@ function ProductsPage() {
   }, "\uC804\uCCB4 \uBE0C\uB79C\uB4DC"), brands.map(b => /*#__PURE__*/React.createElement("option", {
     key: b,
     value: b
-  }, b))), (search || catFilter || brandFilter) && /*#__PURE__*/React.createElement(Btn, {
+  }, b, " (", products.filter(p => p.brand === b).length, ")"))), /*#__PURE__*/React.createElement("select", {
+    value: priceFilter,
+    onChange: e => setPriceFilter(e.target.value),
+    style: {
+      ...inp2,
+      flex: 1,
+      minWidth: 100
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\uC804\uCCB4 \uAC00\uACA9\uB300"), /*#__PURE__*/React.createElement("option", {
+    value: "~5000"
+  }, "~5,000\uC6D0"), /*#__PURE__*/React.createElement("option", {
+    value: "5001~20000"
+  }, "5,001~20,000\uC6D0"), /*#__PURE__*/React.createElement("option", {
+    value: "20001~50000"
+  }, "20,001~50,000\uC6D0"), /*#__PURE__*/React.createElement("option", {
+    value: "50001~"
+  }, "50,001\uC6D0~")), /*#__PURE__*/React.createElement("select", {
+    value: stockFilter,
+    onChange: e => setStockFilter(e.target.value),
+    style: {
+      ...inp2,
+      flex: 1,
+      minWidth: 90
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\uC804\uCCB4 \uC7AC\uACE0"), /*#__PURE__*/React.createElement("option", {
+    value: "\uC788\uC74C"
+  }, "\uC7AC\uACE0 \uC788\uC74C"), /*#__PURE__*/React.createElement("option", {
+    value: "\uC5C6\uC74C"
+  }, "\uC7AC\uACE0 \uC5C6\uC74C"), /*#__PURE__*/React.createElement("option", {
+    value: "\uBD80\uC871"
+  }, "\uC7AC\uACE0 \uBD80\uC871")), /*#__PURE__*/React.createElement("select", {
+    value: sortBy,
+    onChange: e => setSortBy(e.target.value),
+    style: {
+      ...inp2,
+      flex: 1,
+      minWidth: 130
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "default"
+  }, "\uAE30\uBCF8 \uC815\uB82C"), /*#__PURE__*/React.createElement("option", {
+    value: "name"
+  }, "\uC774\uB984\uC21C (\uAC00\uB098\uB2E4)"), /*#__PURE__*/React.createElement("option", {
+    value: "brand"
+  }, "\uBE0C\uB79C\uB4DC\uC21C"), /*#__PURE__*/React.createElement("option", {
+    value: "code"
+  }, "\uCF54\uB4DC\uC21C"), /*#__PURE__*/React.createElement("option", {
+    value: "price_desc"
+  }, "\uC18C\uBE44\uC790\uAC00 \uB192\uC740\uC21C"), /*#__PURE__*/React.createElement("option", {
+    value: "price_asc"
+  }, "\uC18C\uBE44\uC790\uAC00 \uB0AE\uC740\uC21C"), /*#__PURE__*/React.createElement("option", {
+    value: "cost_desc"
+  }, "\uC6D0\uAC00 \uB192\uC740\uC21C"), /*#__PURE__*/React.createElement("option", {
+    value: "cost_asc"
+  }, "\uC6D0\uAC00 \uB0AE\uC740\uC21C"), /*#__PURE__*/React.createElement("option", {
+    value: "fob_desc"
+  }, "FOB \uB192\uC740\uC21C"), /*#__PURE__*/React.createElement("option", {
+    value: "margin_desc"
+  }, "\uB9C8\uC9C4\uC728 \uB192\uC740\uC21C"), /*#__PURE__*/React.createElement("option", {
+    value: "sales_desc"
+  }, "\uCD5C\uB2E4\uD310\uB9E4\uC21C"), /*#__PURE__*/React.createElement("option", {
+    value: "sales_asc"
+  }, "\uCD5C\uC18C\uD310\uB9E4\uC21C"), /*#__PURE__*/React.createElement("option", {
+    value: "stock_desc"
+  }, "\uC7AC\uACE0 \uB9CE\uC740\uC21C"), /*#__PURE__*/React.createElement("option", {
+    value: "stock_asc"
+  }, "\uC7AC\uACE0 \uC801\uC740\uC21C")), (search || catFilter || brandFilter || priceFilter || stockFilter) && /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       setSearch('');
       setCatFilter('');
       setBrandFilter('');
+      setPriceFilter('');
+      setStockFilter('');
+      setSortBy('default');
     },
     color: "outline",
     sm: true
@@ -3289,7 +3429,19 @@ function ProductsPage() {
       flexWrap: 'wrap',
       marginBottom: 12
     }
-  }, brands.slice(0, 15).map(b => /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: () => setBrandFilter(''),
+    style: {
+      padding: '3px 10px',
+      borderRadius: 20,
+      fontSize: 11,
+      cursor: 'pointer',
+      border: '1px solid #e2e8f0',
+      background: !brandFilter ? '#0f172a' : '#fff',
+      color: !brandFilter ? '#fff' : '#475569',
+      fontWeight: !brandFilter ? 600 : 400
+    }
+  }, "\uC804\uCCB4 (", products.length, ")"), brands.map(b => /*#__PURE__*/React.createElement("div", {
     key: b,
     onClick: () => setBrandFilter(brandFilter === b ? '' : b),
     style: {
@@ -3301,14 +3453,7 @@ function ProductsPage() {
       background: brandFilter === b ? '#1d4ed8' : '#fff',
       color: brandFilter === b ? '#fff' : '#475569'
     }
-  }, b, " (", products.filter(p => p.brand === b).length, ")")), brands.length > 15 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '3px 10px',
-      borderRadius: 20,
-      fontSize: 11,
-      color: '#94a3b8'
-    }
-  }, "+", brands.length - 15, "\uAC1C \uBE0C\uB79C\uB4DC")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
+  }, b, " (", products.filter(p => p.brand === b).length, ")"))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
     heads: ['이미지', '코드', '상품명(국문/영문)', '브랜드', '카테고리', '규격', '소비자가', '원가', 'FOB', '입수', editable ? '관리' : ''],
     rows: filtered.slice(0, 200).map((p, i) => /*#__PURE__*/React.createElement("tr", {
       key: p.id,
@@ -4508,13 +4653,12 @@ function StockPage() {
     }
   }, "\uD83D\uDCA1 \uC9C1\uC804\uAC00: ", won(getLastStockPrice(form.productId, modal)), " \uC790\uB3D9\uC785\uB825\uB428")), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uAC70\uB798\uCC98"
-  }, /*#__PURE__*/React.createElement(Input, {
+  }, /*#__PURE__*/React.createElement(BuyerSelect, {
     value: form.partner,
     onChange: v => setForm(f => ({
       ...f,
       partner: v
-    })),
-    placeholder: "\uAC70\uB798\uCC98\uBA85"
+    }))
   }))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uBE44\uACE0"
   }, /*#__PURE__*/React.createElement(Input, {
@@ -4801,6 +4945,116 @@ function ProductDetailModal({
   }, "\uB2EB\uAE30")))));
 }
 const TAX_TYPES = ['부가세포함', '부가세별도', '영세율'];
+function BuyerSelect({
+  value,
+  onChange,
+  placeholder = '거래처 선택'
+}) {
+  const {
+    buyers
+  } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value || '');
+  const filtered = query ? buyers.filter(b => (b.name || '').includes(query) || (b.en || '').toLowerCase().includes(query.toLowerCase())) : buyers;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'relative'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: query,
+    onChange: e => {
+      setQuery(e.target.value);
+      onChange(e.target.value);
+      setOpen(true);
+    },
+    onFocus: () => setOpen(true),
+    onBlur: () => setTimeout(() => setOpen(false), 200),
+    placeholder: placeholder,
+    style: {
+      ...inp
+    },
+    autoComplete: "off"
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onMouseDown: e => {
+      e.preventDefault();
+      setOpen(o => !o);
+    },
+    style: {
+      flexShrink: 0,
+      background: '#f1f5f9',
+      border: '1.5px solid #e2e8f0',
+      borderRadius: 8,
+      padding: '6px 10px',
+      cursor: 'pointer',
+      fontSize: 12,
+      color: '#475569'
+    }
+  }, "\u25BC")), open && filtered.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      top: 'calc(100% + 4px)',
+      left: 0,
+      right: 0,
+      background: '#fff',
+      border: '1.5px solid #2563eb',
+      borderRadius: 10,
+      boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+      zIndex: 999,
+      maxHeight: 240,
+      overflowY: 'auto'
+    }
+  }, !query && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '5px 12px',
+      fontSize: 10,
+      color: '#94a3b8',
+      background: '#f8fafc',
+      borderBottom: '1px solid #e2e8f0'
+    }
+  }, "\uAC70\uB798\uCC98 ", buyers.length, "\uAC1C"), filtered.map(b => /*#__PURE__*/React.createElement("div", {
+    key: b.id,
+    onMouseDown: () => {
+      setQuery(b.name);
+      onChange(b.name);
+      setOpen(false);
+    },
+    style: {
+      padding: '8px 12px',
+      cursor: 'pointer',
+      borderBottom: '1px solid #f1f5f9',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8
+    },
+    onMouseEnter: e => e.currentTarget.style.background = '#eff6ff',
+    onMouseLeave: e => e.currentTarget.style.background = '#fff'
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, b.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: '#94a3b8'
+    }
+  }, b.en || '', " ", b.country ? getFlag(b.country) + ' ' + b.country : '')), b.type && /*#__PURE__*/React.createElement(Tag, {
+    c: b.type === '해외' ? 'blue' : 'green',
+    style: {
+      fontSize: 9
+    }
+  }, b.type)))));
+}
 function ProductSelect({
   value,
   onChange,
@@ -5339,7 +5593,7 @@ function SalesPage() {
     type: "date"
   })), /*#__PURE__*/React.createElement(FG, {
     label: "\uAC70\uB798\uCC98 *"
-  }, /*#__PURE__*/React.createElement(Sel, {
+  }, /*#__PURE__*/React.createElement(BuyerSelect, {
     value: form.partner,
     onChange: v => {
       const b = buyers.find(x => x.name === v);
@@ -5349,12 +5603,7 @@ function SalesPage() {
         country: b ? b.country : f.country
       }));
     }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "\uC120\uD0DD..."), buyers.map(b => /*#__PURE__*/React.createElement("option", {
-    key: b.id,
-    value: b.name
-  }, getFlag(b.country), " ", b.name)))), /*#__PURE__*/React.createElement(FG, {
+  })), /*#__PURE__*/React.createElement(FG, {
     label: "\uAD6D\uAC00"
   }, /*#__PURE__*/React.createElement(Sel, {
     value: form.country,
@@ -5831,18 +6080,13 @@ function PurchasePage() {
     type: "date"
   })), /*#__PURE__*/React.createElement(FG, {
     label: "\uAC70\uB798\uCC98 *"
-  }, /*#__PURE__*/React.createElement(Sel, {
+  }, /*#__PURE__*/React.createElement(BuyerSelect, {
     value: form.partner,
     onChange: v => setForm(f => ({
       ...f,
       partner: v
     }))
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "\uC120\uD0DD..."), buyers.map(b => /*#__PURE__*/React.createElement("option", {
-    key: b.id,
-    value: b.name
-  }, b.name)))), /*#__PURE__*/React.createElement(FG, {
+  })), /*#__PURE__*/React.createElement(FG, {
     label: "\uACFC\uC138\uBD84\uB958"
   }, /*#__PURE__*/React.createElement(Sel, {
     value: form.taxType,
@@ -6154,22 +6398,26 @@ function ReceiptPage() {
     type: "date"
   })), /*#__PURE__*/React.createElement(FG, {
     label: "\uAC70\uB798\uCC98 *"
-  }, /*#__PURE__*/React.createElement(Input, {
+  }, /*#__PURE__*/React.createElement(BuyerSelect, {
     value: form.partner,
     onChange: v => setForm(f => ({
       ...f,
       partner: v
-    })),
-    placeholder: "\uAC70\uB798\uCC98\uBA85"
+    }))
   })), /*#__PURE__*/React.createElement(FG, {
     label: "\uD488\uBAA9"
-  }, /*#__PURE__*/React.createElement(Input, {
+  }, /*#__PURE__*/React.createElement(ProductSelect, {
     value: form.item,
     onChange: v => setForm(f => ({
       ...f,
       item: v
     })),
-    placeholder: "\uD488\uBAA9\uBA85"
+    onSelect: p => setForm(f => ({
+      ...f,
+      item: p.ko,
+      productId: p.id
+    })),
+    placeholder: "\uD488\uBAA9 \uAC80\uC0C9 \uB610\uB294 \uC9C1\uC811\uC785\uB825"
   })), /*#__PURE__*/React.createElement(FG, {
     label: "\uCCAD\uAD6C\uAE08\uC561 *"
   }, /*#__PURE__*/React.createElement(Input, {
@@ -6403,22 +6651,26 @@ function PaymentPage() {
     type: "date"
   })), /*#__PURE__*/React.createElement(FG, {
     label: "\uAC70\uB798\uCC98 *"
-  }, /*#__PURE__*/React.createElement(Input, {
+  }, /*#__PURE__*/React.createElement(BuyerSelect, {
     value: form.partner,
     onChange: v => setForm(f => ({
       ...f,
       partner: v
-    })),
-    placeholder: "\uAC70\uB798\uCC98\uBA85"
+    }))
   })), /*#__PURE__*/React.createElement(FG, {
     label: "\uD488\uBAA9"
-  }, /*#__PURE__*/React.createElement(Input, {
+  }, /*#__PURE__*/React.createElement(ProductSelect, {
     value: form.item,
     onChange: v => setForm(f => ({
       ...f,
       item: v
     })),
-    placeholder: "\uD488\uBAA9\uBA85"
+    onSelect: p => setForm(f => ({
+      ...f,
+      item: p.ko,
+      productId: p.id
+    })),
+    placeholder: "\uD488\uBAA9 \uAC80\uC0C9 \uB610\uB294 \uC9C1\uC811\uC785\uB825"
   })), /*#__PURE__*/React.createElement(FG, {
     label: "\uC9C0\uAE09\uC608\uC815\uC561 *"
   }, /*#__PURE__*/React.createElement(Input, {
@@ -6547,6 +6799,12 @@ function TaxPage() {
       setForm({
         date: todayStr(),
         buyer: '',
+        buyerBizNo: '',
+        buyerAddr: '',
+        buyerCeo: '',
+        buyerEmail: '',
+        buyerBizType: '',
+        writeDate: todayStr(),
         item: '',
         supply: '',
         type: '세금계산서',
@@ -6555,7 +6813,7 @@ function TaxPage() {
       setModal(true);
     }
   }, "\u271A \uBC1C\uD589")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
-    heads: ['발행일', '문서번호', '공급받는자', '품목', '공급가액', '세액', '합계', '유형', editable ? '' : ''].filter(Boolean),
+    heads: ['발행일', '문서번호', '공급받는자', '사업자번호', '품목', '공급가액', '세액', '합계', '유형', editable ? '' : ''].filter(Boolean),
     rows: [...taxInvoices].reverse().map((t, i) => /*#__PURE__*/React.createElement("tr", {
       key: t.id,
       style: {
@@ -6573,6 +6831,12 @@ function TaxPage() {
     }, t.docNo), /*#__PURE__*/React.createElement("td", {
       style: S.td
     }, /*#__PURE__*/React.createElement("strong", null, t.buyer)), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        fontSize: 11,
+        fontFamily: 'monospace'
+      }
+    }, t.buyerBizNo || '—'), /*#__PURE__*/React.createElement("td", {
       style: S.td
     }, t.item || '—'), /*#__PURE__*/React.createElement("td", {
       style: {
@@ -6631,8 +6895,18 @@ function TaxPage() {
     onClose: () => {
       setModal(false);
       setEditId(null);
+    },
+    wide: true
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: '#f8fafc',
+      borderRadius: 8,
+      padding: '10px 14px',
+      marginBottom: 12,
+      fontSize: 11,
+      color: '#475569'
     }
-  }, /*#__PURE__*/React.createElement(Grid2, null, /*#__PURE__*/React.createElement(FG, {
+  }, /*#__PURE__*/React.createElement("strong", null, "\uACF5\uAE09\uC790:"), " \u321C\uC2E0\uD654\uC778\uD130\uAE00\uB85C\uBC8C \xA0|\xA0 \uC0AC\uC5C5\uC790\uBC88\uD638: 000-00-00000 \xA0|\xA0 \uB300\uD45C: \uB300\uD45C\uC774\uC0AC \xA0|\xA0 \uC5C5\uD0DC/\uC885\uBAA9: \uB3C4\uB9E4"), /*#__PURE__*/React.createElement(Grid2, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uBC1C\uD589\uC77C"
   }, /*#__PURE__*/React.createElement(Input, {
     value: form.date,
@@ -6651,26 +6925,87 @@ function TaxPage() {
     }))
   }, /*#__PURE__*/React.createElement("option", null, "\uC138\uAE08\uACC4\uC0B0\uC11C"), /*#__PURE__*/React.createElement("option", null, "\uC601\uC138\uC728"), /*#__PURE__*/React.createElement("option", null, "\uBA74\uC138"))), /*#__PURE__*/React.createElement(FG, {
     label: "\uACF5\uAE09\uBC1B\uB294\uC790 *"
-  }, /*#__PURE__*/React.createElement(Sel, {
+  }, /*#__PURE__*/React.createElement(BuyerSelect, {
     value: form.buyer,
+    onChange: v => {
+      const b = buyers.find(x => x.name === v);
+      setForm(f => ({
+        ...f,
+        buyer: v,
+        buyerBizNo: b?.bizNo || '',
+        buyerAddr: b?.address || '',
+        buyerCeo: b?.ceoName || '',
+        buyerEmail: b?.email || '',
+        buyerBizType: b?.bizType || ''
+      }));
+    }
+  })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uC0AC\uC5C5\uC790\uBC88\uD638"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.buyerBizNo || '',
     onChange: v => setForm(f => ({
       ...f,
-      buyer: v
-    }))
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "\uC120\uD0DD..."), buyers.map(b => /*#__PURE__*/React.createElement("option", {
-    key: b.id,
-    value: b.name
-  }, b.name)))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
-    label: "\uD488\uBAA9"
+      buyerBizNo: v
+    })),
+    placeholder: "000-00-00000"
+  })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uB300\uD45C\uC790\uBA85"
   }, /*#__PURE__*/React.createElement(Input, {
+    value: form.buyerCeo || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      buyerCeo: v
+    })),
+    placeholder: "\uB300\uD45C\uC790\uBA85"
+  })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uC5C5\uD0DC/\uC885\uBAA9"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.buyerBizType || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      buyerBizType: v
+    })),
+    placeholder: "\uB3C4\uB9E4/\uC2DD\uD488\uC678"
+  })), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
+    label: "\uC8FC\uC18C"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.buyerAddr || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      buyerAddr: v
+    })),
+    placeholder: "\uC0AC\uC5C5\uC7A5 \uC8FC\uC18C"
+  }))), /*#__PURE__*/React.createElement(FG, {
+    label: "\uC774\uBA54\uC77C (\uBC1C\uD589\uC6A9)"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.buyerEmail || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      buyerEmail: v
+    })),
+    placeholder: "email@example.com"
+  })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uC791\uC131\uC77C"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.writeDate || form.date,
+    onChange: v => setForm(f => ({
+      ...f,
+      writeDate: v
+    })),
+    type: "date"
+  })), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
+    label: "\uD488\uBAA9"
+  }, /*#__PURE__*/React.createElement(ProductSelect, {
     value: form.item,
     onChange: v => setForm(f => ({
       ...f,
       item: v
     })),
-    placeholder: "\uD488\uBAA9\uBA85"
+    onSelect: p => setForm(f => ({
+      ...f,
+      item: p.ko
+    })),
+    placeholder: "\uD488\uBAA9 \uAC80\uC0C9 \uB610\uB294 \uC9C1\uC811\uC785\uB825"
   }))), /*#__PURE__*/React.createElement(FG, {
     label: "\uACF5\uAE09\uAC00\uC561 *"
   }, /*#__PURE__*/React.createElement(Input, {
@@ -6803,8 +7138,13 @@ function BuyersPage() {
         email: '',
         phone: '',
         address: '',
+        addressEn: '',
         payment: '100% T/T in advance',
         type: '해외',
+        bizNo: '',
+        ceoName: '',
+        fax: '',
+        bizType: '',
         channel: '',
         channelSub: ''
       });
@@ -6841,7 +7181,7 @@ function BuyersPage() {
       color: countryFilter === c ? '#fff' : '#475569'
     }
   }, getFlag(c), " ", c, " (", buyers.filter(b => b.country === c).length, ")"))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
-    heads: ['거래처명', '영문명', '국가', '담당자', '이메일', '결제조건', '유형', editable ? '' : ''].filter(Boolean),
+    heads: ['거래처명', '국가', '사업자번호', '담당자', '이메일', '결제조건', '유형', editable ? '' : ''].filter(Boolean),
     rows: filtered.map((b, i) => /*#__PURE__*/React.createElement("tr", {
       key: b.id,
       style: {
@@ -6850,14 +7190,14 @@ function BuyersPage() {
     }, /*#__PURE__*/React.createElement("td", {
       style: S.td
     }, /*#__PURE__*/React.createElement("strong", null, b.name)), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, getFlag(b.country), " ", b.country || '—'), /*#__PURE__*/React.createElement("td", {
       style: {
         ...S.td,
         fontSize: 11,
-        color: '#64748b'
+        fontFamily: 'monospace'
       }
-    }, b.en || '—'), /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, getFlag(b.country), " ", b.country || '—'), /*#__PURE__*/React.createElement("td", {
+    }, b.bizNo || '—'), /*#__PURE__*/React.createElement("td", {
       style: S.td
     }, b.contact || '—'), /*#__PURE__*/React.createElement("td", {
       style: {
@@ -6925,6 +7265,24 @@ function BuyersPage() {
     })),
     placeholder: "English name"
   })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uC0AC\uC5C5\uC790\uB4F1\uB85D\uBC88\uD638"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.bizNo || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      bizNo: v
+    })),
+    placeholder: "000-00-00000"
+  })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uB300\uD45C\uC790\uBA85"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.ceoName || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      ceoName: v
+    })),
+    placeholder: "\uB300\uD45C\uC790\uBA85"
+  })), /*#__PURE__*/React.createElement(FG, {
     label: "\uAD6D\uAC00"
   }, /*#__PURE__*/React.createElement(Sel, {
     value: form.country,
@@ -6973,6 +7331,24 @@ function BuyersPage() {
     })),
     placeholder: "+82-10-0000-0000"
   })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uD329\uC2A4"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.fax || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      fax: v
+    })),
+    placeholder: "\uD329\uC2A4\uBC88\uD638"
+  })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uC5C5\uD0DC/\uC885\uBAA9"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.bizType || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      bizType: v
+    })),
+    placeholder: "\uB3C4\uB9E4/\uC2DD\uD488\uC678"
+  })), /*#__PURE__*/React.createElement(FG, {
     label: "\uACB0\uC81C\uC870\uAC74"
   }, /*#__PURE__*/React.createElement(Input, {
     value: form.payment,
@@ -6982,14 +7358,23 @@ function BuyersPage() {
     })),
     placeholder: "100% T/T in advance"
   })), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
-    label: "\uC8FC\uC18C"
+    label: "\uC8FC\uC18C *"
   }, /*#__PURE__*/React.createElement(Input, {
     value: form.address,
     onChange: v => setForm(f => ({
       ...f,
       address: v
     })),
-    placeholder: "\uC8FC\uC18C"
+    placeholder: "\uC0AC\uC5C5\uC7A5 \uC8FC\uC18C"
+  }))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
+    label: "\uC601\uBB38 \uC8FC\uC18C"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.addressEn || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      addressEn: v
+    })),
+    placeholder: "English address"
   })))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -7192,30 +7577,17 @@ function PriceListPage() {
     onClose: () => setModal(false)
   }, /*#__PURE__*/React.createElement(Grid2, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uAC70\uB798\uCC98 *"
-  }, /*#__PURE__*/React.createElement(Sel, {
-    value: form.buyerId,
+  }, /*#__PURE__*/React.createElement(BuyerSelect, {
+    value: form.buyer,
     onChange: v => {
-      const b = buyers.find(x => x.id === v);
+      const b = buyers.find(x => x.name === v);
       setForm(f => ({
         ...f,
-        buyerId: v,
-        buyer: b?.name || ''
+        buyerId: b?.id || '',
+        buyer: v
       }));
     }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "\uC120\uD0DD..."), buyers.map(b => /*#__PURE__*/React.createElement("option", {
-    key: b.id,
-    value: b.id
-  }, getFlag(b.country), " ", b.name)))), /*#__PURE__*/React.createElement(FG, {
-    label: "\uCC44\uB110"
-  }, /*#__PURE__*/React.createElement(Sel, {
-    value: form.channel,
-    onChange: v => setForm(f => ({
-      ...f,
-      channel: v
-    }))
-  }, /*#__PURE__*/React.createElement("option", null, "\uB3C4\uB9E4"), /*#__PURE__*/React.createElement("option", null, "\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4"), /*#__PURE__*/React.createElement("option", null, "\uCFE0\uD321"), /*#__PURE__*/React.createElement("option", null, "\uC624\uD508\uB9C8\uCF13"), /*#__PURE__*/React.createElement("option", null, "\uD574\uC678\uC218\uCD9C"))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
+  })), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uD488\uBAA9 *"
   }, /*#__PURE__*/React.createElement(ProductSelect, {
     value: form.product,
@@ -7946,31 +8318,50 @@ function SchedulePage() {
     setSchedules,
     showToast,
     canEdit,
-    user,
     syncDB,
+    user,
     requestApproval,
     buyers
   } = useAuth();
   const [modal, setModal] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [selDate, setSelDate] = useState(null);
+  const [viewDate, setViewDate] = useState(new Date());
   const [form, setForm] = useState({
     date: todayStr(),
+    endDate: '',
     title: '',
-    type: '업무',
+    type: '일반',
     partner: '',
-    assignee: '',
-    desc: '',
-    status: '예정',
-    priority: '보통'
+    note: '',
+    important: false
   });
   const editable = canEdit('schedule');
-  const today = schedules.filter(s => s.date === todayStr() && s.status !== '완료');
-  const upcoming = schedules.filter(s => {
-    const d = Math.ceil((new Date(s.date) - new Date(todayStr())) / (1000 * 60 * 60 * 24));
-    return d > 0 && d <= 7 && s.status !== '완료';
-  });
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const prevMonth = () => setViewDate(new Date(year, month - 1, 1));
+  const nextMonth = () => setViewDate(new Date(year, month + 1, 1));
+  const today = todayStr();
   const save = () => {
-    if (!form.title) {
-      showToast('제목을 입력하세요', '#dc2626');
+    if (!form.title.trim() || !form.date) {
+      showToast('제목과 날짜를 입력하세요', '#dc2626');
+      return;
+    }
+    if (editId) {
+      const upd = schedules.map(s => s.id === editId ? {
+        ...form,
+        id: editId
+      } : s);
+      setSchedules(upd);
+      syncDB.schedule({
+        ...form,
+        id: editId
+      });
+      showToast('✅ 일정 수정!');
+      setModal(false);
+      setEditId(null);
       return;
     }
     const entry = {
@@ -7988,6 +8379,29 @@ function SchedulePage() {
     setModal(false);
     showToast('✅ 일정 등록!');
   };
+  const del = id => {
+    const upd = {
+      ...schedules.find(s => s.id === id),
+      status: '취소',
+      canceledAt: todayStr()
+    };
+    setSchedules(prev => prev.map(s => s.id === id ? upd : s));
+    syncDB.schedule(upd);
+    showToast('🗑️ 취소됨');
+  };
+  const getDateScheds = d => {
+    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    return schedules.filter(s => s.date === ds && s.status !== '취소');
+  };
+  const typeColor = {
+    '중요': '#dc2626',
+    '미팅': '#1d4ed8',
+    '출장': '#7c3aed',
+    '마감': '#ea580c',
+    '일반': '#15803d',
+    '기타': '#64748b'
+  };
+  const selScheds = selDate ? schedules.filter(s => s.date === selDate && s.status !== '취소') : [];
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -7995,125 +8409,393 @@ function SchedulePage() {
       alignItems: 'center',
       marginBottom: 16
     }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 18,
       fontWeight: 700
     }
-  }, "\uD83D\uDCC5 \uC2A4\uCF00\uC904"), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCC5 \uC2A4\uCF00\uC904"), editable && /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      setForm({
+        date: selDate || todayStr(),
+        endDate: '',
+        title: '',
+        type: '일반',
+        partner: '',
+        note: '',
+        important: false
+      });
+      setEditId(null);
+      setModal(true);
+    }
+  }, "\u271A \uC77C\uC815 \uCD94\uAC00")), /*#__PURE__*/React.createElement(Card, {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '12px 16px',
+      borderBottom: '1px solid #e2e8f0'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: prevMonth,
+    style: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: 18,
+      color: '#475569',
+      padding: '4px 8px'
+    }
+  }, "\u2039"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 16
+    }
+  }, year, "\uB144 ", month + 1, "\uC6D4"), /*#__PURE__*/React.createElement("button", {
+    onClick: nextMonth,
+    style: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: 18,
+      color: '#475569',
+      padding: '4px 8px'
+    }
+  }, "\u203A")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(7,1fr)',
+      background: '#f8fafc'
+    }
+  }, ['일', '월', '화', '수', '목', '금', '토'].map((d, i) => /*#__PURE__*/React.createElement("div", {
+    key: d,
+    style: {
+      textAlign: 'center',
+      padding: '8px 0',
+      fontSize: 11,
+      fontWeight: 600,
+      color: i === 0 ? '#dc2626' : i === 6 ? '#1d4ed8' : '#475569'
+    }
+  }, d))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(7,1fr)'
+    }
+  }, Array.from({
+    length: firstDay
+  }).map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: 'e' + i,
+    style: {
+      minHeight: 80,
+      borderRight: '1px solid #f1f5f9',
+      borderBottom: '1px solid #f1f5f9'
+    }
+  })), Array.from({
+    length: daysInMonth
+  }).map((_, i) => {
+    const d = i + 1;
+    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const dayScheds = getDateScheds(d);
+    const isToday = ds === today;
+    const isSel = ds === selDate;
+    const dow = (firstDay + i) % 7;
+    return /*#__PURE__*/React.createElement("div", {
+      key: d,
+      onClick: () => setSelDate(isSel ? null : ds),
+      style: {
+        minHeight: 80,
+        borderRight: '1px solid #f1f5f9',
+        borderBottom: '1px solid #f1f5f9',
+        padding: '4px',
+        cursor: 'pointer',
+        background: isSel ? '#eff6ff' : isToday ? '#fefce8' : '#fff',
+        transition: 'background .1s'
+      },
+      onMouseEnter: e => {
+        if (!isSel && !isToday) e.currentTarget.style.background = '#f8fafc';
+      },
+      onMouseLeave: e => {
+        if (!isSel && !isToday) e.currentTarget.style.background = '#fff';
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: isToday ? 700 : 400,
+        color: dow === 0 ? '#dc2626' : dow === 6 ? '#1d4ed8' : isToday ? '#1d4ed8' : '#0f172a',
+        width: 22,
+        height: 22,
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: isToday ? '#1d4ed8' : 'transparent',
+        color: isToday ? '#fff' : dow === 0 ? '#dc2626' : dow === 6 ? '#1d4ed8' : '#0f172a'
+      }
+    }, d), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 2
+      }
+    }, dayScheds.slice(0, 3).map((s, idx) => /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      style: {
+        fontSize: 10,
+        background: typeColor[s.type] || '#64748b',
+        color: '#fff',
+        borderRadius: 3,
+        padding: '1px 4px',
+        marginBottom: 1,
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
+        textOverflow: 'ellipsis',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2
+      }
+    }, s.important && '⭐', s.title)), dayScheds.length > 3 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: '#94a3b8'
+      }
+    }, "+", dayScheds.length - 3, "\uAC1C")));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      flexWrap: 'wrap',
+      padding: '8px 16px',
+      borderTop: '1px solid #e2e8f0'
+    }
+  }, Object.entries(typeColor).map(([type, color]) => /*#__PURE__*/React.createElement("div", {
+    key: type,
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      fontSize: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 10,
+      height: 10,
+      background: color,
+      borderRadius: 2
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#64748b'
+    }
+  }, type))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      fontSize: 10,
+      marginLeft: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "\u2B50"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#64748b'
+    }
+  }, "\uC911\uC694")))), selDate && /*#__PURE__*/React.createElement(Card, {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(CardHead, {
+    left: `📋 ${selDate} 일정`,
+    right: editable && /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => {
+        setForm({
+          date: selDate,
+          endDate: '',
+          title: '',
+          type: '일반',
+          partner: '',
+          note: '',
+          important: false
+        });
+        setEditId(null);
+        setModal(true);
+      },
+      color: "outline",
+      sm: true
+    }, "+ \uCD94\uAC00")
+  }), selScheds.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 20,
+      textAlign: 'center',
+      color: '#94a3b8',
+      fontSize: 12
+    }
+  }, "\uC774 \uB0A0\uC9DC\uC5D0 \uC77C\uC815\uC774 \uC5C6\uC2B5\uB2C8\uB2E4") : selScheds.map(s => /*#__PURE__*/React.createElement("div", {
+    key: s.id,
+    style: {
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: 10,
+      padding: '12px 16px',
+      borderBottom: '1px solid #f1f5f9'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 4,
+      alignSelf: 'stretch',
+      borderRadius: 2,
+      background: typeColor[s.type] || '#64748b',
+      flexShrink: 0
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 2
+    }
+  }, s.important && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13
+    }
+  }, "\u2B50"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13
+    }
+  }, s.title), /*#__PURE__*/React.createElement(Tag, {
+    c: s.type === '중요' ? 'red' : s.type === '미팅' ? 'blue' : s.type === '출장' ? 'purple' : 'green'
+  }, s.type)), s.partner && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#64748b'
+    }
+  }, "\uD83D\uDC65 ", s.partner), s.note && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#94a3b8',
+      marginTop: 2
+    }
+  }, s.note), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: '#94a3b8',
+      marginTop: 2
+    }
+  }, s.createdBy, " \uB4F1\uB85D")), editable && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 4,
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    sm: true,
+    color: "outline",
+    onClick: () => {
+      setForm({
+        ...s,
+        important: s.important || false
+      });
+      setEditId(s.id);
+      setModal(true);
+    }
+  }, "\u270F\uFE0F"), /*#__PURE__*/React.createElement(Btn, {
+    sm: true,
+    color: "red",
+    onClick: () => {
+      if (!window.confirm('일정을 취소 처리하시겠습니까?')) return;
+      del(s.id);
+    }
+  }, "\uCDE8\uC18C"))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(CardHead, {
+    left: `${month + 1}월 전체 일정 (${schedules.filter(s => {
+      const m = s.date?.slice(0, 7);
+      return m === `${year}-${String(month + 1).padStart(2, '0')}` && s.status !== '취소';
+    }).length}건)`
+  }), schedules.filter(s => {
+    const m = s.date?.slice(0, 7);
+    return m === `${year}-${String(month + 1).padStart(2, '0')}` && s.status !== '취소';
+  }).sort((a, b) => a.date > b.date ? 1 : -1).map((s, i) => /*#__PURE__*/React.createElement("div", {
+    key: s.id,
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      padding: '9px 16px',
+      borderBottom: '1px solid #f1f5f9',
+      background: s.important ? '#fefce8' : '#fff'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 4,
+      height: 36,
+      borderRadius: 2,
+      background: typeColor[s.type] || '#64748b',
+      flexShrink: 0
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6
+    }
+  }, s.important && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12
+    }
+  }, "\u2B50"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 600,
+      fontSize: 12
+    }
+  }, s.title), /*#__PURE__*/React.createElement(Tag, {
+    c: s.type === '중요' ? 'red' : s.type === '미팅' ? 'blue' : 'green',
+    style: {
+      fontSize: 9
+    }
+  }, s.type)), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: '#94a3b8'
     }
-  }, schedules.length, "\uAC1C")), editable && /*#__PURE__*/React.createElement(Btn, {
+  }, s.date, s.partner ? ' · ' + s.partner : '')), editable && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    sm: true,
+    color: "outline",
     onClick: () => {
       setForm({
-        date: todayStr(),
-        title: '',
-        type: '업무',
-        partner: '',
-        assignee: '',
-        desc: '',
-        status: '예정',
-        priority: '보통'
+        ...s,
+        important: s.important || false
       });
+      setEditId(s.id);
       setModal(true);
     }
-  }, "\u271A \uC77C\uC815 \uCD94\uAC00")), today.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\u270F\uFE0F")))), schedules.filter(s => s.date?.slice(0, 7) === `${year}-${String(month + 1).padStart(2, '0')}` && s.status !== '취소').length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
-      background: '#eff6ff',
-      border: '1px solid #bfdbfe',
-      borderRadius: 10,
-      padding: '10px 14px',
-      marginBottom: 12
+      padding: 24,
+      textAlign: 'center',
+      color: '#94a3b8',
+      fontSize: 12
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      color: '#1d4ed8',
-      marginBottom: 6
+  }, "\uC774\uBC88\uB2EC \uB4F1\uB85D\uB41C \uC77C\uC815\uC774 \uC5C6\uC2B5\uB2C8\uB2E4")), modal && /*#__PURE__*/React.createElement(Modal, {
+    title: editId ? '✏️ 일정 수정' : '📅 일정 추가',
+    onClose: () => {
+      setModal(false);
+      setEditId(null);
     }
-  }, "\uD83D\uDCCC \uC624\uB298 \uC77C\uC815 (", today.length, "\uAC74)"), today.map(s => /*#__PURE__*/React.createElement("div", {
-    key: s.id,
-    style: {
-      fontSize: 12,
-      padding: '4px 0',
-      borderBottom: '1px solid #dbeafe',
-      display: 'flex',
-      justifyContent: 'space-between'
-    }
-  }, /*#__PURE__*/React.createElement("span", null, s.title), /*#__PURE__*/React.createElement(Tag, {
-    c: s.status === '완료' ? 'green' : 'blue'
-  }, s.status)))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
-    heads: ['날짜', '제목', '유형', '거래처', '담당', '우선순위', '상태', ''],
-    rows: [...schedules].sort((a, b) => a.date > b.date ? 1 : -1).map((s, i) => {
-      const dday = Math.ceil((new Date(s.date) - new Date(todayStr())) / (1000 * 60 * 60 * 24));
-      return /*#__PURE__*/React.createElement("tr", {
-        key: s.id,
-        style: {
-          background: s.status === '완료' ? '#f0fdf4' : dday < 0 ? '#fef2f2' : i % 2 ? '#fafbff' : '#fff'
-        }
-      }, /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, s.date, dday === 0 ? /*#__PURE__*/React.createElement(Tag, {
-        c: "red"
-      }, " D-Day") : dday > 0 && dday <= 3 ? /*#__PURE__*/React.createElement(Tag, {
-        c: "orange"
-      }, " D-", dday) : null), /*#__PURE__*/React.createElement("td", {
-        style: {
-          ...S.td,
-          fontWeight: 600
-        }
-      }, s.title), /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, /*#__PURE__*/React.createElement(Tag, {
-        c: "blue"
-      }, s.type)), /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, s.partner || '—'), /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, s.assignee || '—'), /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, /*#__PURE__*/React.createElement(Tag, {
-        c: s.priority === '긴급' ? 'red' : s.priority === '높음' ? 'orange' : 'gray'
-      }, s.priority || '보통')), /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, /*#__PURE__*/React.createElement(Tag, {
-        c: s.status === '완료' ? 'green' : 'blue'
-      }, s.status || '예정')), /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: 'flex',
-          gap: 4
-        }
-      }, s.status !== '완료' && /*#__PURE__*/React.createElement(Btn, {
-        onClick: () => setSchedules(prev => prev.map(x => x.id === s.id ? {
-          ...x,
-          status: '완료'
-        } : x)),
-        color: "green",
-        sm: true
-      }, "\uC644\uB8CC"), /*#__PURE__*/React.createElement(Btn, {
-        onClick: () => {
-          if (!confirmDel('일정을 삭제하시겠습니까?')) return;
-          const upd = {
-            ...s,
-            status: '취소',
-            canceledAt: todayStr()
-          };
-          setSchedules(prev => prev.map(x => x.id === s.id ? upd : x));
-          syncDB.schedule(upd);
-        },
-        color: "red",
-        sm: true
-      }, "\uCDE8\uC18C"))));
-    })
-  })), modal && /*#__PURE__*/React.createElement(Modal, {
-    title: "\uD83D\uDCC5 \uC77C\uC815 \uCD94\uAC00",
-    onClose: () => setModal(false)
   }, /*#__PURE__*/React.createElement(Grid2, null, /*#__PURE__*/React.createElement(FG, {
-    label: "\uB0A0\uC9DC"
+    label: "\uB0A0\uC9DC *"
   }, /*#__PURE__*/React.createElement(Input, {
     value: form.date,
     onChange: v => setForm(f => ({
@@ -8122,14 +8804,15 @@ function SchedulePage() {
     })),
     type: "date"
   })), /*#__PURE__*/React.createElement(FG, {
-    label: "\uC720\uD615"
-  }, /*#__PURE__*/React.createElement(Sel, {
-    value: form.type,
+    label: "\uC885\uB8CC\uC77C (\uC120\uD0DD)"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.endDate || '',
     onChange: v => setForm(f => ({
       ...f,
-      type: v
-    }))
-  }, /*#__PURE__*/React.createElement("option", null, "\uC5C5\uBB34"), /*#__PURE__*/React.createElement("option", null, "\uBBF8\uD305"), /*#__PURE__*/React.createElement("option", null, "\uB0A9\uAE30"), /*#__PURE__*/React.createElement("option", null, "\uACB0\uC81C"), /*#__PURE__*/React.createElement("option", null, "\uAE30\uD0C0"))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
+      endDate: v
+    })),
+    type: "date"
+  })), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uC81C\uBAA9 *"
   }, /*#__PURE__*/React.createElement(Input, {
     value: form.title,
@@ -8139,39 +8822,58 @@ function SchedulePage() {
     })),
     placeholder: "\uC77C\uC815 \uC81C\uBAA9"
   }))), /*#__PURE__*/React.createElement(FG, {
+    label: "\uC720\uD615"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    value: form.type,
+    onChange: v => setForm(f => ({
+      ...f,
+      type: v
+    }))
+  }, /*#__PURE__*/React.createElement("option", null, "\uC77C\uBC18"), /*#__PURE__*/React.createElement("option", null, "\uC911\uC694"), /*#__PURE__*/React.createElement("option", null, "\uBBF8\uD305"), /*#__PURE__*/React.createElement("option", null, "\uCD9C\uC7A5"), /*#__PURE__*/React.createElement("option", null, "\uB9C8\uAC10"), /*#__PURE__*/React.createElement("option", null, "\uAE30\uD0C0"))), /*#__PURE__*/React.createElement(FG, {
     label: "\uAC70\uB798\uCC98"
-  }, /*#__PURE__*/React.createElement(Input, {
-    value: form.partner,
+  }, /*#__PURE__*/React.createElement(BuyerSelect, {
+    value: form.partner || '',
     onChange: v => setForm(f => ({
       ...f,
       partner: v
-    })),
-    placeholder: "\uAD00\uB828 \uAC70\uB798\uCC98"
-  })), /*#__PURE__*/React.createElement(FG, {
-    label: "\uB2F4\uB2F9\uC790"
-  }, /*#__PURE__*/React.createElement(Input, {
-    value: form.assignee,
-    onChange: v => setForm(f => ({
-      ...f,
-      assignee: v
-    })),
-    placeholder: "\uB2F4\uB2F9\uC790"
-  })), /*#__PURE__*/React.createElement(FG, {
-    label: "\uC6B0\uC120\uC21C\uC704"
-  }, /*#__PURE__*/React.createElement(Sel, {
-    value: form.priority,
-    onChange: v => setForm(f => ({
-      ...f,
-      priority: v
     }))
-  }, /*#__PURE__*/React.createElement("option", null, "\uBCF4\uD1B5"), /*#__PURE__*/React.createElement("option", null, "\uB192\uC74C"), /*#__PURE__*/React.createElement("option", null, "\uAE34\uAE09"))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
-    label: "\uBA54\uBAA8"
-  }, /*#__PURE__*/React.createElement(Input, {
-    value: form.desc,
-    onChange: v => setForm(f => ({
+  })), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      cursor: 'pointer',
+      padding: '6px 0'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: form.important || false,
+    onChange: e => setForm(f => ({
       ...f,
-      desc: v
+      important: e.target.checked
     })),
+    style: {
+      width: 16,
+      height: 16
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "\u2B50 \uC911\uC694 \uC77C\uC815\uC73C\uB85C \uD45C\uC2DC"))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
+    label: "\uBA54\uBAA8"
+  }, /*#__PURE__*/React.createElement("textarea", {
+    value: form.note || '',
+    onChange: e => setForm(f => ({
+      ...f,
+      note: e.target.value
+    })),
+    rows: 2,
+    style: {
+      ...inp,
+      resize: 'vertical'
+    },
     placeholder: "\uC0C1\uC138 \uB0B4\uC6A9"
   })))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -8181,11 +8883,14 @@ function SchedulePage() {
       marginTop: 12
     }
   }, /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => setModal(false),
+    onClick: () => {
+      setModal(false);
+      setEditId(null);
+    },
     color: "outline"
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save
-  }, "\u2705 \uC800\uC7A5"))));
+  }, user.role === 'staff' ? '✅ 승인 요청' : '✅ 저장'))));
 }
 function QuotePage() {
   const {
@@ -8220,8 +8925,17 @@ function QuotePage() {
   const [buyerFilter, setBuyerFilter] = useState('');
   const [historyModal, setHistoryModal] = useState(null);
   const [detailProduct, setDetailProduct] = useState(null);
+  const [prodSort, setProdSort] = useState('default');
   const editable = canEdit('quote');
-  const filteredProds = search ? products.filter(p => (p.ko || '').includes(search) || (p.brand || '').includes(search)) : products;
+  const filteredProds = (() => {
+    let list = search ? products.filter(p => (p.ko || '').includes(search) || (p.brand || '').includes(search)) : products;
+    if (prodSort === 'name') list = [...list].sort((a, b) => (a.ko || '').localeCompare(b.ko || ''));else if (prodSort === 'brand') list = [...list].sort((a, b) => (a.brand || '').localeCompare(b.brand || ''));else if (prodSort === 'price_desc') list = [...list].sort((a, b) => (b.consumer || 0) - (a.consumer || 0));else if (prodSort === 'price_asc') list = [...list].sort((a, b) => (a.consumer || 0) - (b.consumer || 0));else if (prodSort === 'sales_desc') list = [...list].sort((a, b) => {
+      const sA = sales.filter(s => s.productId === a.id).reduce((x, s) => x + (s.qty || 1), 0);
+      const sB = sales.filter(s => s.productId === b.id).reduce((x, s) => x + (s.qty || 1), 0);
+      return sB - sA;
+    });else if (prodSort === 'stock_desc') list = [...list].sort((a, b) => getStock(b.id) - getStock(a.id));
+    return list;
+  })();
   const filteredQuotes = buyerFilter ? quotes.filter(q => q.receiver === buyerFilter) : quotes;
   const copyQuote = q => {
     setForm({
@@ -8886,12 +9600,42 @@ function QuotePage() {
     color: form.type === 'ko' ? 'blue' : 'purple'
   }, "\uD83D\uDCBE \uC800\uC7A5")))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(CardHead, {
     left: "\uC0C1\uD488 \uC120\uD0DD",
-    right: /*#__PURE__*/React.createElement("span", {
+    right: /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 6,
+        alignItems: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("select", {
+      value: prodSort,
+      onChange: e => setProdSort(e.target.value),
+      style: {
+        fontSize: 11,
+        border: '1px solid #e2e8f0',
+        borderRadius: 6,
+        padding: '3px 6px',
+        color: '#475569'
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: "default"
+    }, "\uAE30\uBCF8\uC21C"), /*#__PURE__*/React.createElement("option", {
+      value: "name"
+    }, "\uC774\uB984\uC21C"), /*#__PURE__*/React.createElement("option", {
+      value: "brand"
+    }, "\uBE0C\uB79C\uB4DC\uC21C"), /*#__PURE__*/React.createElement("option", {
+      value: "price_desc"
+    }, "\uAC00\uACA9 \uB192\uC740\uC21C"), /*#__PURE__*/React.createElement("option", {
+      value: "price_asc"
+    }, "\uAC00\uACA9 \uB0AE\uC740\uC21C"), /*#__PURE__*/React.createElement("option", {
+      value: "sales_desc"
+    }, "\uCD5C\uB2E4\uD310\uB9E4\uC21C"), /*#__PURE__*/React.createElement("option", {
+      value: "stock_desc"
+    }, "\uC7AC\uACE0 \uB9CE\uC740\uC21C")), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         color: '#94a3b8'
       }
-    }, "\uD074\uB9AD \uCD94\uAC00 \xB7 \u2139\uFE0F \uC0C1\uC138")
+    }, "\uD074\uB9AD \uCD94\uAC00 \xB7 \u2139\uFE0F \uC0C1\uC138"))
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '10px 12px 6px'
@@ -9262,6 +10006,27 @@ function InvoicePage() {
       portDest: v
     }))
   })), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
+    label: "\uAC70\uB798\uCC98 \uC120\uD0DD (\uC790\uB3D9\uC644\uC131)"
+  }, /*#__PURE__*/React.createElement(BuyerSelect, {
+    value: form.consigneeName || '',
+    onChange: v => {
+      const b = buyers.find(x => x.name === v);
+      if (b) setForm(f => ({
+        ...f,
+        consigneeName: b.name,
+        consignee: b.name + (b.address ? '\n' + b.address : '') + (b.contact ? '\nAttn: ' + b.contact : '')
+      }));else setForm(f => ({
+        ...f,
+        consigneeName: v
+      }));
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: '#94a3b8',
+      marginTop: 3
+    }
+  }, "\uC120\uD0DD \uC2DC Consignee \uC790\uB3D9 \uC785\uB825"))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
     label: "Shipper"
   }, /*#__PURE__*/React.createElement("textarea", {
     value: form.shipper,
@@ -9964,6 +10729,8 @@ function UsersPage() {
         email: '',
         password: '',
         role: 'staff',
+        phone: '',
+        dept: '',
         permissions: {},
         active: true
       });
@@ -10002,12 +10769,18 @@ function UsersPage() {
     style: {
       fontWeight: 700
     }
-  }, u.name), /*#__PURE__*/React.createElement("div", {
+  }, u.name, " ", u.dept && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: '#64748b',
+      fontWeight: 400
+    }
+  }, "(", u.dept, ")")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: '#94a3b8'
     }
-  }, u.email)), /*#__PURE__*/React.createElement(Tag, {
+  }, u.email, " ", u.phone && '· ' + u.phone)), /*#__PURE__*/React.createElement(Tag, {
     c: u.active ? 'green' : 'gray'
   }, u.active ? '활성' : '비활성'), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
@@ -10115,6 +10888,38 @@ function UsersPage() {
     })),
     placeholder: "\uBE44\uBC00\uBC88\uD638"
   })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uC5F0\uB77D\uCC98"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.phone || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      phone: v
+    })),
+    placeholder: "010-0000-0000"
+  })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uBD80\uC11C/\uC9C1\uCC45"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.dept || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      dept: v
+    })),
+    placeholder: "\uC601\uC5C5\uBD80/\uB300\uB9AC"
+  })), /*#__PURE__*/React.createElement(FG, {
+    label: "\uC5ED\uD560"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    value: form.role || 'staff',
+    onChange: v => setForm(f => ({
+      ...f,
+      role: v
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "staff"
+  }, "\uC9C1\uC6D0"), /*#__PURE__*/React.createElement("option", {
+    value: "admin"
+  }, "\uAD00\uB9AC\uC790"), /*#__PURE__*/React.createElement("option", {
+    value: "vice"
+  }, "\uC804\uBB34"))), /*#__PURE__*/React.createElement(FG, {
     label: "\uC0C1\uD0DC"
   }, /*#__PURE__*/React.createElement(Sel, {
     value: form.active ? 'active' : 'inactive',
