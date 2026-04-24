@@ -895,6 +895,9 @@ const Input = ({
   type: type,
   value: value || '',
   onChange: e => onChange(e.target.value),
+  onFocus: e => {
+    if (type === 'number') e.target.select();
+  },
   placeholder: placeholder,
   style: {
     ...inp,
@@ -951,52 +954,61 @@ const Modal = ({
   onClose,
   children,
   wide = false
-}) => /*#__PURE__*/React.createElement("div", {
-  onClick: onClose,
-  style: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(15,23,42,.5)',
-    backdropFilter: 'blur(3px)',
-    zIndex: 200,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  }
-}, /*#__PURE__*/React.createElement("div", {
-  onClick: e => e.stopPropagation(),
-  style: {
-    background: '#fff',
-    borderRadius: 14,
-    width: '90%',
-    maxWidth: wide ? 860 : 580,
-    maxHeight: '90vh',
-    overflowY: 'auto',
-    padding: 22,
-    boxShadow: '0 20px 60px rgba(0,0,0,.2)'
-  }
-}, /*#__PURE__*/React.createElement("div", {
-  style: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16
-  }
-}, /*#__PURE__*/React.createElement("span", {
-  style: {
-    fontSize: 15,
-    fontWeight: 700
-  }
-}, title), /*#__PURE__*/React.createElement("button", {
-  onClick: onClose,
-  style: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 18,
-    color: '#94a3b8'
-  }
-}, "\u2715")), children));
+}) => {
+  useEffect(() => {
+    const fn = e => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, [onClose]);
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: onClose,
+    style: {
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(15,23,42,.5)',
+      backdropFilter: 'blur(3px)',
+      zIndex: 200,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    style: {
+      background: '#fff',
+      borderRadius: 14,
+      width: '90%',
+      maxWidth: wide ? 860 : 580,
+      maxHeight: '90vh',
+      overflowY: 'auto',
+      padding: 22,
+      boxShadow: '0 20px 60px rgba(0,0,0,.2)'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 15,
+      fontWeight: 700
+    }
+  }, title), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: 18,
+      color: '#94a3b8'
+    }
+  }, "\u2715")), children));
+};
 const Tbl = ({
   heads,
   rows,
@@ -1187,7 +1199,7 @@ function App() {
     if (!window.XLSX) {
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload = () => console.log('✅ SheetJS loaded');
+      s.onload = () => {};
       document.head.appendChild(s);
     }
   }, []);
@@ -1211,7 +1223,7 @@ function App() {
         if (sc.length > 0) setSchedules(sc.map(fromDB.schedule));
         if (pl.length > 0) setPricelist(pl.map(fromDB.pricelist));
         setDbReady(true);
-        console.log('✅ Supabase 데이터 로드 완료');
+        ;
       } catch (e) {
         console.error('Supabase 로드 실패, 로컬 데이터 사용:', e);
         setDbReady(true);
@@ -1599,7 +1611,8 @@ function App() {
     setPage,
     syncDB,
     dbReady,
-    exchangeRate
+    exchangeRate,
+    setExchangeRate
   };
   if (!user) return /*#__PURE__*/React.createElement(LoginPage, {
     onLogin: login
@@ -1955,7 +1968,8 @@ function DashPage() {
     quotes,
     schedules = [],
     user,
-    setPage
+    setPage,
+    stocks
   } = useAuth();
   const now = new Date();
   const thisMonth = now.toISOString().slice(0, 7);
@@ -2015,6 +2029,15 @@ function DashPage() {
     const d = Math.ceil((new Date(s.date) - new Date(todayStr())) / (1000 * 60 * 60 * 24));
     return d >= 0 && d <= 3 && s.status !== '완료';
   });
+  // 연체 미수금 D-Day
+  const overdueReceipts2 = receipts.filter(r => {
+    const remaining = Math.max(0, (r.billed || 0) - (r.received || 0));
+    const overdue = r.expectedDate && new Date(r.expectedDate) < new Date();
+    return remaining > 0 && overdue && r.status !== '취소';
+  }).map(r => ({
+    ...r,
+    dday: Math.floor((new Date() - new Date(r.expectedDate)) / (1000 * 60 * 60 * 24))
+  })).sort((a, b) => b.dday - a.dday);
   const overdueReceipts = receipts.filter(r => {
     const remain = (r.billed || 0) - (r.received || 0);
     if (remain <= 0) return false;
@@ -2055,7 +2078,76 @@ function DashPage() {
     brandSales[brand] = (brandSales[brand] || 0) + (s.total || 0);
   });
   const topBrands = Object.entries(brandSales).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const todayDate = todayStr();
+  const todayExpected = receipts.filter(r => r.expectedDate === todayDate && r.status !== '취소').reduce((a, r) => a + Math.max(0, (r.billed || 0) - (r.received || 0)), 0);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(3,1fr)',
+      gap: 12,
+      marginBottom: 16
+    }
+  }, [{
+    label: '이번달 총 매출',
+    value: won(mSales),
+    sub: `전월 대비 ${mSales >= lmSales ? '▲' : '▼'}${Math.abs(pct(mSales, lmSales))}%`,
+    color: '#15803d',
+    bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)',
+    border: '#86efac',
+    icon: '💰',
+    page: 'sales'
+  }, {
+    label: '미수금 합계',
+    value: won(unpaid),
+    sub: `${receipts.filter(r => Math.max(0, (r.billed || 0) - (r.received || 0)) > 0 && r.status !== '취소').length}건 미수 · 연체 ${receipts.filter(r => {
+      const d = r.expectedDate;
+      return d && new Date(d) < new Date() && Math.max(0, (r.billed || 0) - (r.received || 0)) > 0 && r.status !== '취소';
+    }).length}건`,
+    color: '#dc2626',
+    bg: 'linear-gradient(135deg,#fef2f2,#fee2e2)',
+    border: '#fca5a5',
+    icon: '⚠️',
+    page: 'receipt'
+  }, {
+    label: '오늘 입금 예정',
+    value: won(todayExpected),
+    sub: todayExpected > 0 ? '오늘 입금 예정' : '오늘 예정 없음',
+    color: '#1d4ed8',
+    bg: 'linear-gradient(135deg,#eff6ff,#dbeafe)',
+    border: '#93c5fd',
+    icon: '📅',
+    page: 'receipt'
+  }].map((s, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    onClick: () => setPage(s.page),
+    style: {
+      background: s.bg,
+      border: `1.5px solid ${s.border}`,
+      borderRadius: 14,
+      padding: '16px 18px',
+      cursor: 'pointer'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#64748b',
+      fontWeight: 600,
+      marginBottom: 6
+    }
+  }, s.icon, " ", s.label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 22,
+      fontWeight: 900,
+      color: s.color,
+      fontFamily: 'monospace'
+    }
+  }, s.value), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#94a3b8',
+      marginTop: 4
+    }
+  }, s.sub)))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       justifyContent: 'space-between',
@@ -2084,7 +2176,59 @@ function DashPage() {
   }, "\uD83D\uDCCB \uACAC\uC801\uC11C \uC791\uC131"), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => setPage('schedule'),
     sm: true
-  }, "\uD83D\uDCC5 \uC2A4\uCF00\uC904"))), overdueReceipts.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCC5 \uC2A4\uCF00\uC904"))), overdueReceipts2.length > 0 && /*#__PURE__*/React.createElement("div", {
+    onClick: () => setPage('receipt'),
+    style: {
+      background: '#fef2f2',
+      border: '2px solid #dc2626',
+      borderRadius: 10,
+      padding: '10px 14px',
+      marginBottom: 8,
+      cursor: 'pointer'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16
+    }
+  }, "\uD83D\uDEA8"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      color: '#dc2626',
+      fontSize: 13
+    }
+  }, "\uC5F0\uCCB4 \uBBF8\uC218\uAE08 ", overdueReceipts2.length, "\uAC74 \u2014 \uC989\uC2DC \uD655\uC778 \uD544\uC694!")), overdueReceipts2.slice(0, 3).map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: r.id,
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      fontSize: 11,
+      padding: '3px 0',
+      borderTop: i > 0 ? '1px solid #fee2e2' : 'none'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#475569',
+      fontWeight: 600
+    }
+  }, r.partner), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      color: r.dday > 14 ? '#dc2626' : r.dday > 7 ? '#ea580c' : '#ca8a04'
+    }
+  }, "D+", r.dday, "\uC77C \uC5F0\uCCB4 \xB7 ", won(Math.max(0, (r.billed || 0) - (r.received || 0)))))), overdueReceipts2.length > 3 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: '#94a3b8',
+      marginTop: 4
+    }
+  }, "\uC678 ", overdueReceipts2.length - 3, "\uAC74 \uB354...")), /*#__PURE__*/React.createElement("div", {
     onClick: () => setPage('receipt'),
     style: {
       background: '#fef2f2',
@@ -2122,7 +2266,7 @@ function DashPage() {
       fontSize: 12,
       fontWeight: 600
     }
-  }, "\uD655\uC778 \u2192")), zeroStock.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\uD655\uC778 \u2192")), ")}", zeroStock.length > 0 && /*#__PURE__*/React.createElement("div", {
     onClick: () => setPage('stock'),
     style: {
       background: '#fef2f2',
@@ -2702,7 +2846,11 @@ function ProductsPage() {
     products,
     setProducts,
     showToast,
-    canEdit
+    canEdit,
+    exchangeRate,
+    setExchangeRate,
+    syncDB,
+    user
   } = useAuth();
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
@@ -3590,7 +3738,9 @@ function StockPage() {
     setStocks,
     getStock,
     showToast,
-    canEdit
+    canEdit,
+    syncDB,
+    user
   } = useAuth();
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({
@@ -4058,7 +4208,240 @@ function StockPage() {
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: saveBulk,
     color: "blue"
-  }, "\u2705 \uC800\uC7A5"))))), modal && modal !== 'bulk' && /*#__PURE__*/React.createElement(Modal, {
+  }, "\u2705 \uC800\uC7A5"))))), stockDetail && (() => {
+    const cur = getStock(stockDetail.id);
+    const history = [...stocks].filter(s => s.productId === stockDetail.id).reverse().slice(0, 15);
+    const tin = stocks.filter(s => s.productId === stockDetail.id && s.type === 'in').reduce((a, s) => a + s.qty, 0);
+    const tout = stocks.filter(s => s.productId === stockDetail.id && s.type === 'out').reduce((a, s) => a + s.qty, 0);
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: () => setStockDetail(null),
+      style: {
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15,23,42,.55)',
+        backdropFilter: 'blur(4px)',
+        zIndex: 300,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: e => e.stopPropagation(),
+      style: {
+        background: '#fff',
+        borderRadius: 16,
+        width: '100%',
+        maxWidth: 580,
+        maxHeight: '90vh',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 24px 60px rgba(0,0,0,.25)',
+        overflow: 'hidden'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: 'linear-gradient(135deg,#0f172a,#1e3a5f)',
+        padding: '16px 20px',
+        color: '#fff'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start'
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: '#93c5fd',
+        marginBottom: 3
+      }
+    }, stockDetail.id, " \xB7 ", stockDetail.brand || '—'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 16,
+        fontWeight: 700
+      }
+    }, stockDetail.ko), stockDetail.en && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: '#94a3b8',
+        marginTop: 2
+      }
+    }, stockDetail.en)), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setStockDetail(null),
+      style: {
+        background: 'rgba(255,255,255,.15)',
+        border: 'none',
+        borderRadius: 8,
+        color: '#fff',
+        cursor: 'pointer',
+        padding: '6px 10px',
+        fontSize: 14
+      }
+    }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr 1fr 1fr',
+        gap: 8,
+        marginTop: 14
+      }
+    }, [{
+      label: '현재고',
+      value: cur,
+      color: cur <= 0 ? '#fca5a5' : cur <= (stockDetail.safe || 0) ? '#fcd34d' : '#86efac',
+      big: true
+    }, {
+      label: '안전재고',
+      value: stockDetail.safe || 0,
+      color: '#93c5fd'
+    }, {
+      label: '총 입고',
+      value: tin,
+      color: '#93c5fd'
+    }, {
+      label: '총 출고',
+      value: tout,
+      color: '#fca5a5'
+    }].map((s, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        background: 'rgba(255,255,255,.1)',
+        borderRadius: 8,
+        padding: '8px 10px',
+        textAlign: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: 'rgba(255,255,255,.6)',
+        marginBottom: 3
+      }
+    }, s.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: 'monospace',
+        fontWeight: 700,
+        fontSize: s.big ? 20 : 14,
+        color: s.color
+      }
+    }, s.value))))), editable && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 8,
+        padding: '12px 16px',
+        borderBottom: '1px solid #e2e8f0',
+        background: '#f8fafc'
+      }
+    }, /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => {
+        setStockDetail(null);
+        setForm({
+          date: todayStr(),
+          productId: stockDetail.id,
+          qty: '',
+          price: String(stockDetail.cost || ''),
+          partner: '',
+          note: ''
+        });
+        setModal('in');
+      },
+      color: "blue",
+      style: {
+        justifyContent: 'center'
+      }
+    }, "\uD83D\uDCE5 \uC785\uACE0 \uB4F1\uB85D"), /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => {
+        setStockDetail(null);
+        setForm({
+          date: todayStr(),
+          productId: stockDetail.id,
+          qty: '',
+          price: '',
+          partner: '',
+          note: ''
+        });
+        setModal('out');
+      },
+      color: "green",
+      style: {
+        justifyContent: 'center',
+        opacity: cur <= 0 ? .5 : 1
+      },
+      disabled: cur <= 0
+    }, "\uD83D\uDCE4 \uCD9C\uACE0 \uB4F1\uB85D", cur <= 0 ? ' (재고없음)' : '')), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        overflowY: 'auto'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '10px 16px 6px',
+        fontSize: 12,
+        fontWeight: 600,
+        color: '#475569'
+      }
+    }, "\uD83D\uDCCB \uCD5C\uADFC \uC785\uCD9C\uACE0 \uC774\uB825"), history.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: 24,
+        textAlign: 'center',
+        color: '#94a3b8',
+        fontSize: 12
+      }
+    }, "\uC785\uCD9C\uACE0 \uB0B4\uC5ED\uC774 \uC5C6\uC5B4\uC694") : /*#__PURE__*/React.createElement("table", {
+      style: {
+        width: '100%',
+        borderCollapse: 'collapse'
+      }
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+      style: {
+        background: '#f8fafc'
+      }
+    }, ['날짜', '구분', '수량', '단가', '거래처'].map((h, i) => /*#__PURE__*/React.createElement("th", {
+      key: i,
+      style: {
+        ...S.th,
+        padding: '6px 12px'
+      }
+    }, h)))), /*#__PURE__*/React.createElement("tbody", null, history.map((s, i) => /*#__PURE__*/React.createElement("tr", {
+      key: s.id,
+      style: {
+        background: i % 2 ? '#fafbff' : '#fff'
+      }
+    }, /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, s.date), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, /*#__PURE__*/React.createElement(Tag, {
+      c: s.type === 'in' ? 'blue' : 'green'
+    }, s.type === 'in' ? '📥 입고' : '📤 출고')), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        fontFamily: 'monospace',
+        fontWeight: 700,
+        color: s.type === 'in' ? '#1d4ed8' : '#ea580c'
+      }
+    }, s.type === 'in' ? '+' : '-', s.qty), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        fontFamily: 'monospace'
+      }
+    }, s.price ? won(s.price) : '—'), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        fontSize: 11
+      }
+    }, s.partner || '—')))))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '10px 16px',
+        borderTop: '1px solid #e2e8f0',
+        textAlign: 'right'
+      }
+    }, /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => setStockDetail(null),
+      color: "outline"
+    }, "\uB2EB\uAE30"))));
+  })(), modal && modal !== 'bulk' && /*#__PURE__*/React.createElement(Modal, {
     title: modal === 'in' ? '📥 입고 등록' : '📤 출고 등록',
     onClose: () => setModal(null)
   }, /*#__PURE__*/React.createElement(Grid2, null, /*#__PURE__*/React.createElement(FG, {
@@ -4141,7 +4524,26 @@ function StockPage() {
       note: v
     })),
     placeholder: "\uBA54\uBAA8"
-  })))), /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
+    label: "\uD83D\uDCCE \uC99D\uBE59\uC790\uB8CC URL (\uC774\uCCB4\uD655\uC778\uC99D/\uC601\uC218\uC99D)"
+  }, /*#__PURE__*/React.createElement(Input, {
+    value: form.evidenceUrl || '',
+    onChange: v => setForm(f => ({
+      ...f,
+      evidenceUrl: v
+    })),
+    placeholder: "\uAD6C\uAE00\uB4DC\uB77C\uC774\uBE0C \uACF5\uC720\uB9C1\uD06C \uC785\uB825"
+  }), form.evidenceUrl && /*#__PURE__*/React.createElement("a", {
+    href: form.evidenceUrl,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      fontSize: 11,
+      color: '#1d4ed8',
+      display: 'block',
+      marginTop: 4
+    }
+  }, "\uD83D\uDCCE \uC99D\uBE59\uC790\uB8CC \uC5F4\uAE30 \u2192")))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -4540,7 +4942,8 @@ function SalesPage() {
     canEdit,
     requestApproval,
     user,
-    syncDB
+    syncDB,
+    pricelist
   } = useAuth();
   const [modal, setModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -4874,7 +5277,17 @@ function SalesPage() {
       onClick: () => printSale(s),
       color: "outline",
       sm: true
-    }, "\uD83D\uDCC4"), /*#__PURE__*/React.createElement(Btn, {
+    }, "\uD83D\uDCC4"), s.evidenceUrl && /*#__PURE__*/React.createElement("a", {
+      href: s.evidenceUrl,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      style: {
+        textDecoration: 'none'
+      }
+    }, /*#__PURE__*/React.createElement(Btn, {
+      color: "outline",
+      sm: true
+    }, "\uD83D\uDCCE")), /*#__PURE__*/React.createElement(Btn, {
       onClick: () => setSales(prev => prev.map(x => x.id === s.id ? {
         ...x,
         collected: !x.collected
@@ -4896,14 +5309,19 @@ function SalesPage() {
       sm: true
     }, "\u270F\uFE0F"), /*#__PURE__*/React.createElement(Btn, {
       onClick: () => {
-        if (!confirmDel('매출을 삭제하시겠습니까?')) return;
-        const id = s.id;
-        setSales(prev => prev.filter(x => x.id !== id));
-        syncDB.delSale(id);
+        if (!window.confirm('매출을 취소 처리하시겠습니까?\n(삭제되지 않고 취소 상태로 변경됩니다)')) return;
+        const upd = {
+          ...s,
+          status: '취소',
+          canceledAt: todayStr(),
+          canceledBy: user.name
+        };
+        setSales(prev => prev.map(x => x.id === s.id ? upd : x));
+        syncDB.sale(upd);
       },
-      color: "outline",
+      color: "red",
       sm: true
-    }, "\u2715")))))
+    }, "\uCDE8\uC18C")))))
   })), modal && /*#__PURE__*/React.createElement(Modal, {
     title: editTarget ? '💰 매출 수정' : '💰 매출 등록',
     onClose: () => {
@@ -5062,7 +5480,9 @@ function PurchasePage() {
     setStocks,
     showToast,
     canEdit,
-    syncDB
+    syncDB,
+    user,
+    requestApproval
   } = useAuth();
   const [modal, setModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -5315,6 +5735,7 @@ function PurchasePage() {
     }
   }, s.v)))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
     heads: ['날짜', '거래처', '품목', '공급가', '부가세', '합계', '과세', '상태', editable ? '관리' : ''].filter(Boolean),
+    empty: "\uB9E4\uCD9C \uB0B4\uC5ED\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uB9E4\uCD9C\uC744 \uB4F1\uB85D\uD574\uBCF4\uC138\uC694!",
     rows: [...filtered].reverse().map((s, i) => /*#__PURE__*/React.createElement("tr", {
       key: s.id,
       style: {
@@ -5380,13 +5801,19 @@ function PurchasePage() {
       sm: true
     }, "\uC218\uC815"), /*#__PURE__*/React.createElement(Btn, {
       onClick: () => {
-        if (!confirmDel('매입을 삭제하시겠습니까?')) return;
-        setPurchases(prev => prev.filter(x => x.id !== s.id));
-        syncDB.delPurchase(s.id);
+        if (!window.confirm('매입을 취소 처리하시겠습니까?')) return;
+        const upd = {
+          ...s,
+          status: '취소',
+          canceledAt: todayStr(),
+          canceledBy: user.name
+        };
+        setPurchases(prev => prev.map(x => x.id === s.id ? upd : x));
+        syncDB.purchase(upd);
       },
-      color: "outline",
+      color: "red",
       sm: true
-    }, "\u2715")))))
+    }, "\uCDE8\uC18C")))))
   })), modal && /*#__PURE__*/React.createElement(Modal, {
     title: editTarget ? '✏️ 매입 수정' : '🛒 매입 등록',
     onClose: () => {
@@ -5504,8 +5931,40 @@ function ReceiptPage() {
     setReceipts,
     showToast,
     canEdit,
-    syncDB
+    syncDB,
+    user,
+    requestApproval,
+    buyers
   } = useAuth();
+  const getDday = expectedDate => {
+    if (!expectedDate) return null;
+    const diff = Math.floor((new Date(expectedDate) - new Date()) / (1000 * 60 * 60 * 24));
+    return diff;
+  };
+  const getOverdueColor = dday => {
+    if (dday === null) return null;
+    if (dday < -14) return {
+      bg: '#fef2f2',
+      border: '#fca5a5',
+      text: '#dc2626'
+    }; // 14일 초과 연체 - 빨강
+    if (dday < -7) return {
+      bg: '#fff7ed',
+      border: '#fed7aa',
+      text: '#ea580c'
+    }; // 7일 초과 - 주황
+    if (dday < 0) return {
+      bg: '#fefce8',
+      border: '#fef08a',
+      text: '#ca8a04'
+    }; // 연체 - 노랑
+    if (dday === 0) return {
+      bg: '#eff6ff',
+      border: '#bfdbfe',
+      text: '#1d4ed8'
+    }; // 오늘
+    return null;
+  };
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({
     date: todayStr(),
@@ -5668,16 +6127,21 @@ function ReceiptPage() {
         }
       }, /*#__PURE__*/React.createElement(Btn, {
         sm: true,
-        color: "outline",
+        color: "red",
         onClick: () => {
-          if (!confirmDel('수금 내역을 삭제하시겠습니까?')) return;
-          setReceipts(prev => prev.filter(x => x.id !== r.id));
-          syncDB.delReceipt(r.id);
+          if (!window.confirm('수금 내역을 취소 처리하시겠습니까?')) return;
+          const upd = {
+            ...r,
+            status: '취소',
+            canceledAt: todayStr()
+          };
+          setReceipts(prev => prev.map(x => x.id === r.id ? upd : x));
+          syncDB.receipt(upd);
         }
-      }, "\u2715"))));
+      }, "\uCDE8\uC18C"))));
     })
   })), modal && /*#__PURE__*/React.createElement(Modal, {
-    title: "\uD83D\uDCB5 \uC218\uAE08 \uB4F1\uB85D",
+    title: typeof modal === 'number' || typeof modal === 'string' && modal !== true ? '✏️ 수금 수정' : '💵 수금 등록',
     onClose: () => setModal(false)
   }, /*#__PURE__*/React.createElement(Grid2, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uB0A0\uC9DC"
@@ -5755,7 +6219,10 @@ function PaymentPage() {
     setPayments,
     showToast,
     canEdit,
-    syncDB
+    syncDB,
+    user,
+    requestApproval,
+    buyers
   } = useAuth();
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({
@@ -5909,16 +6376,21 @@ function PaymentPage() {
         style: S.td
       }, /*#__PURE__*/React.createElement(Btn, {
         sm: true,
-        color: "outline",
+        color: "red",
         onClick: () => {
-          if (!confirmDel('지급 내역을 삭제하시겠습니까?')) return;
-          setPayments(prev => prev.filter(x => x.id !== r.id));
-          syncDB.delPayment(r.id);
+          if (!window.confirm('지급 내역을 취소 처리하시겠습니까?')) return;
+          const upd = {
+            ...r,
+            status: '취소',
+            canceledAt: todayStr()
+          };
+          setPayments(prev => prev.map(x => x.id === r.id ? upd : x));
+          syncDB.payment(upd);
         }
-      }, "\u2715")));
+      }, "\uCDE8\uC18C")));
     })
   })), modal && /*#__PURE__*/React.createElement(Modal, {
-    title: "\uD83D\uDCB8 \uC9C0\uAE09 \uB4F1\uB85D",
+    title: typeof modal === 'number' || typeof modal === 'string' && modal !== true ? '✏️ 지급 수정' : '💸 지급 등록',
     onClose: () => setModal(false)
   }, /*#__PURE__*/React.createElement(Grid2, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uB0A0\uC9DC"
@@ -5997,7 +6469,9 @@ function TaxPage() {
     buyers,
     showToast,
     canEdit,
-    syncDB
+    syncDB,
+    user,
+    requestApproval
   } = useAuth();
   const [modal, setModal] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -6140,13 +6614,18 @@ function TaxPage() {
       sm: true
     }, "\u270F\uFE0F"), /*#__PURE__*/React.createElement(Btn, {
       onClick: () => {
-        if (!confirmDel('세금계산서를 삭제하시겠습니까?')) return;
-        setTaxInvoices(prev => prev.filter(x => x.id !== t.id));
-        syncDB.delTax(t.id);
+        if (!window.confirm('세금계산서를 취소 처리하시겠습니까?')) return;
+        const upd = {
+          ...t,
+          status: '취소',
+          canceledAt: todayStr()
+        };
+        setTaxInvoices(prev => prev.map(x => x.id === t.id ? upd : x));
+        syncDB.tax(upd);
       },
-      color: "outline",
+      color: "red",
       sm: true
-    }, "\u2715")))))
+    }, "\uCDE8\uC18C")))))
   })), modal && /*#__PURE__*/React.createElement(Modal, {
     title: editId ? '✏️ 세금계산서 수정' : '🧾 세금계산서 발행',
     onClose: () => {
@@ -6231,7 +6710,8 @@ function BuyersPage() {
     setBuyers,
     showToast,
     canEdit,
-    syncDB
+    syncDB,
+    user
   } = useAuth();
   const [modal, setModal] = useState(false);
   const [countryFilter, setCountryFilter] = useState('');
@@ -7467,7 +7947,9 @@ function SchedulePage() {
     showToast,
     canEdit,
     user,
-    syncDB
+    syncDB,
+    requestApproval,
+    buyers
   } = useAuth();
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({
@@ -7615,12 +8097,17 @@ function SchedulePage() {
       }, "\uC644\uB8CC"), /*#__PURE__*/React.createElement(Btn, {
         onClick: () => {
           if (!confirmDel('일정을 삭제하시겠습니까?')) return;
-          setSchedules(prev => prev.filter(x => x.id !== s.id));
-          syncDB.delSchedule(s.id);
+          const upd = {
+            ...s,
+            status: '취소',
+            canceledAt: todayStr()
+          };
+          setSchedules(prev => prev.map(x => x.id === s.id ? upd : x));
+          syncDB.schedule(upd);
         },
-        color: "outline",
+        color: "red",
         sm: true
-      }, "\u2715"))));
+      }, "\uCDE8\uC18C"))));
     })
   })), modal && /*#__PURE__*/React.createElement(Modal, {
     title: "\uD83D\uDCC5 \uC77C\uC815 \uCD94\uAC00",
@@ -8085,13 +8572,18 @@ function QuotePage() {
       sm: true
     }, "\u2705 \uC218\uC8FC"), /*#__PURE__*/React.createElement(Btn, {
       onClick: () => {
-        if (!confirmDel('견적서를 삭제하시겠습니까?')) return;
-        setQuotes(prev => prev.filter(x => x.id !== q.id));
-        syncDB.delQuote(q.id);
+        if (!window.confirm('견적서를 취소 처리하시겠습니까?')) return;
+        const upd = {
+          ...q,
+          status: '취소',
+          canceledAt: todayStr()
+        };
+        setQuotes(prev => prev.map(x => x.id === q.id ? upd : x));
+        syncDB.quote(upd);
       },
-      color: "outline",
+      color: "red",
       sm: true
-    }, "\u2715")))))
+    }, "\uCDE8\uC18C")))))
   })), historyModal && (() => {
     const bQuotes = [...quotes].filter(q => q.receiver === historyModal).reverse();
     return /*#__PURE__*/React.createElement(Modal, {
@@ -8503,8 +8995,12 @@ function InvoicePage() {
     products,
     showToast,
     user,
-    syncDB
+    syncDB,
+    buyers,
+    requestApproval,
+    canEdit
   } = useAuth();
+  const editable = canEdit('invoice');
   const [tab, setTab] = useState('list');
   const [form, setForm] = useState({
     type: 'PI',
@@ -8993,7 +9489,17 @@ function MyPage() {
     users,
     setUsers,
     showToast,
-    syncDB
+    syncDB,
+    sales,
+    purchases,
+    stocks,
+    receipts,
+    payments,
+    taxInvoices,
+    quotes,
+    buyers,
+    products,
+    schedules
   } = useAuth();
   const [curPw, setCurPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -9038,18 +9544,27 @@ function MyPage() {
     setConfirmPw('');
     showToast('✅ 비밀번호 변경 완료!', '#15803d');
   };
-  const {
-    sales,
-    purchases,
-    stocks,
-    receipts,
-    payments,
-    taxInvoices,
-    quotes,
-    buyers,
-    products,
-    schedules
-  } = useAuth();
+
+  // 위 useAuth에서 이미 선언됨
+  // 주간 자동 백업 알림
+  useEffect(() => {
+    const lastBackup = localStorage.getItem('last_backup_date');
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0=일, 1=월...
+    if (dayOfWeek === 1) {
+      // 매주 월요일
+      if (!lastBackup || new Date(lastBackup) < new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)) {
+        setTimeout(() => {
+          if (window.confirm('📦 주간 데이터 백업 알림!\n\n지난 한 주간의 데이터를 백업하시겠습니까?\n(취소하면 다음 주에 다시 알림)')) {
+            {
+              exportAll();
+              localStorage.setItem('last_backup_date', today.toISOString().slice(0, 10));
+            }
+          }
+        }, 2000);
+      }
+    }
+  }, []);
   const exportAll = () => {
     const data = {
       products,
@@ -9074,6 +9589,30 @@ function MyPage() {
     a.click();
     URL.revokeObjectURL(url);
     showToast('✅ 전체 데이터 백업 완료!', '#15803d');
+  };
+  const exportTax = () => {
+    const dateFrom = prompt('시작일 입력 (예: 2025-01-01)', '');
+    const dateTo = prompt('종료일 입력 (예: 2025-03-31)', '');
+    if (!dateFrom || !dateTo) {
+      showToast('날짜를 입력해주세요', '#dc2626');
+      return;
+    }
+    // 매출 세무 자료
+    const salesData = sales.filter(s => s.date >= dateFrom && s.date <= dateTo && s.status !== '취소');
+    const purchaseData = purchases.filter(p => p.date >= dateFrom && p.date <= dateTo && p.status !== '취소');
+    const taxData = taxInvoices.filter(t => t.date >= dateFrom && t.date <= dateTo && t.status !== '취소');
+    const rows = [['== 매출 내역 =='], ['날짜', '문서번호', '거래처', '품목', '공급가액', '부가세', '합계', '과세유형', '수금여부'], ...salesData.map(s => [s.date, s.docNo || '', s.partner, s.item || '', s.supply || 0, s.vat || 0, s.total || 0, s.taxType || '부가세포함', s.collected ? '수금완료' : '미수금']), ['합계', '', '', '', salesData.reduce((a, s) => a + (s.supply || 0), 0), salesData.reduce((a, s) => a + (s.vat || 0), 0), salesData.reduce((a, s) => a + (s.total || 0), 0), '', ''], [], ['== 매입 내역 =='], ['날짜', '문서번호', '거래처', '품목', '공급가액', '부가세', '합계', '과세유형', '지급여부'], ...purchaseData.map(p => [p.date, p.docNo || '', p.partner, p.item || '', p.supply || 0, p.vat || 0, p.total || 0, p.taxType || '부가세포함', p.paid ? '지급완료' : '미지급']), ['합계', '', '', '', purchaseData.reduce((a, p) => a + (p.supply || 0), 0), purchaseData.reduce((a, p) => a + (p.vat || 0), 0), purchaseData.reduce((a, p) => a + (p.total || 0), 0), '', ''], [], ['== 세금계산서 =='], ['발행일', '문서번호', '공급받는자', '품목', '공급가액', '세액', '합계', '유형'], ...taxData.map(t => [t.date, t.docNo || '', t.buyer, t.item || '', t.supply || 0, t.vat || 0, t.total || 0, t.type || ''])];
+    const csv = rows.map(r => Array.isArray(r) ? r.map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(',') : '').join('\n');
+    const blob = new Blob(['\uFEFF' + csv], {
+      type: 'text/csv;charset=utf-8'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `신화ERP_세무신고_${dateFrom}_${dateTo}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`✅ 세무 신고용 자료 다운로드! (매출 ${salesData.length}건, 매입 ${purchaseData.length}건)`, '#15803d');
   };
   const exportCSV = type => {
     let rows = [];
@@ -9266,6 +9805,12 @@ function MyPage() {
       gap: 8
     }
   }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: exportTax,
+    color: "green",
+    style: {
+      justifyContent: 'center'
+    }
+  }, "\uD83E\uDDFE \uC138\uBB34\uC2E0\uACE0\uC6A9 \uC5D1\uC140 (\uB0A0\uC9DC\uBC94\uC704 \uC9C0\uC815)"), /*#__PURE__*/React.createElement(Btn, {
     onClick: exportAll,
     color: "blue",
     style: {
@@ -9304,7 +9849,9 @@ function UsersPage() {
   const {
     users,
     setUsers,
-    showToast
+    showToast,
+    syncDB,
+    user
   } = useAuth();
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({
@@ -9868,7 +10415,9 @@ function ApprovalPage() {
 }
 function CbmPage() {
   const {
-    exchangeRate
+    exchangeRate,
+    setExchangeRate,
+    products
   } = useAuth();
   const [items, setItems] = useState([{
     id: 1,
