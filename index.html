@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1946 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1953 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -687,7 +687,7 @@ const INIT_USERS = [{
   dept: '본부장'
 }, {
   id: 'u004',
-  name: '한과장',
+  name: '한재성',
   email: 'hangwajang',
   password: '1234',
   role: 'staff',
@@ -14892,6 +14892,33 @@ function UsersPage() {
       fontWeight: 700
     }
   }, "\uD83D\uDC65 \uC9C1\uC6D0\uAD00\uB9AC"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      if (!confirm('⚠️ 사용자 데이터를 초기 4명(대표/전무/본부장/과장)으로 정리합니다. 계속할까요?\n\n- 옛날 사용자(대표, 홍길동 등) 모두 삭제\n- INIT_USERS 4명만 남김\n- Supabase에도 동일하게 적용')) return;
+      const INIT = [
+        { id: 'u001', name: '신현민', email: 'shi9249', password: '1234', role: 'ceo', permissions: {}, active: true, phone: '', dept: '대표' },
+        { id: 'u002', name: '이민수', email: 'leeminsoo', password: '1234', role: 'admin', permissions: {}, active: true, phone: '', dept: '전무' },
+        { id: 'u003', name: '이현석', email: 'leestones', password: '1234', role: 'admin', permissions: {}, active: true, phone: '01048615237', dept: '본부장' },
+        { id: 'u004', name: '한재성', email: 'hangwajang', password: '1234', role: 'staff', permissions: {}, active: true, phone: '', dept: '과장' }
+      ];
+      setUsers(INIT);
+      // Supabase에도 강제 동기화
+      (async () => {
+        try {
+          for (const u of INIT) {
+            await sb.upsert('erp_users', {
+              id: u.id, name: u.name, email: u.email, password: u.password,
+              role: u.role, phone: u.phone, dept: u.dept,
+              permissions: u.permissions, active: u.active
+            });
+          }
+          showToast('✅ 사용자 4명으로 초기화 완료!', '#15803d');
+        } catch (e) {
+          showToast('Supabase 동기화 실패: ' + e.message, '#dc2626');
+        }
+      })();
+    },
+    color: 'red'
+  }, "\uD83D\uDD04 \uC0AC\uC6A9\uC790 4\uBA85\uC73C\uB85C \uCD08\uAE30\uD654"), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       setForm({
         name: '',
