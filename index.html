@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1547 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1557 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -2649,11 +2649,7 @@ function App() {
       padding: 20,
       minWidth: 0
     }
-  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && (() => {
-      const cv = canView('receipt');
-      console.log('🔍 receipt 라우팅 - canView:', cv, 'user:', user?.name, 'role:', user?.role);
-      return cv;
-    })() && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CbmPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), 
+  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CbmPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), 
     // 권한 차단 안내 (페이지는 매칭되는데 canView가 false인 경우)
     ['products','stock','sales','purchase','receipt','payment','tax','quote','buyers','pricelist','schedule','invoice'].includes(page) && !canView(page) && /*#__PURE__*/React.createElement("div", {
       style: { padding: 40, textAlign: 'center' }
@@ -7259,7 +7255,6 @@ function PurchasePage() {
 }
 function ReceiptPage() {
   const ctx = useAuth();
-  console.log('🔍 ReceiptPage 시작 - 사용자:', ctx?.user?.name, '역할:', ctx?.user?.role);
   if (!ctx || !ctx.user) {
     return /*#__PURE__*/React.createElement("div", {
       style: { padding: 40, textAlign: 'center', color: '#dc2626' }
@@ -7554,7 +7549,7 @@ function ReceiptPage() {
   }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const totalBilled = filteredRec.reduce((a, r) => a + (r.billed || 0), 0);
   const totalReceived = filteredRec.reduce((a, r) => a + (r.received || 0), 0);
-  return /*#__PURE__*/React.createElement("div", null, receiptFilter === 'overdue' && /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement("div", { style: { minHeight: 200 } }, /*#__PURE__*/React.createElement("div", { style: { padding: 12, background: '#dcfce7', marginBottom: 10, fontSize: 13, color: '#166534', fontWeight: 700, border: '2px solid #86efac', borderRadius: 8 } }, "✅ 수금관리 페이지 정상 로드됨 - 데이터 ", filteredRec.length, "건"), receiptFilter === 'overdue' && /*#__PURE__*/React.createElement("div", {
     style: {
       background: 'linear-gradient(135deg,#fef2f2,#fee2e2)',
       border: '2px solid #fca5a5',
