@@ -6846,6 +6846,9 @@ function ReceiptPage() {
     return null;
   };
   const [modal, setModal] = useState(false);
+  const [bankModal, setBankModal] = useState(null);
+  const [bankRows, setBankRows] = useState([]);
+  const [bankMatches, setBankMatches] = useState([]);
   const [form, setForm] = useState({
     date: todayStr(),
     partner: '',
@@ -7524,9 +7527,6 @@ function PaymentPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [modal, setModal] = useState(false);
-  const [bankModal, setBankModal] = useState(null);
-  const [bankRows, setBankRows] = useState([]);
-  const [bankMatches, setBankMatches] = useState([]);
   const [form, setForm] = useState({
     date: todayStr(),
     partner: '',
