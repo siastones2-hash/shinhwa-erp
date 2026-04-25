@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1756 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1818 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -654,10 +654,6 @@ const MENUS = [{
   id: 'schedule',
   label: '스케줄',
   icon: '📅'
-}, {
-  id: 'help',
-  label: '사용 가이드',
-  icon: '📖'
 }];
 const INIT_USERS = [{
   id: 'u001',
@@ -2623,6 +2619,14 @@ function App() {
       gap: 6
     }
   }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setPage('help'),
+    color: "outline",
+    sm: true,
+    style: {
+      borderColor: '#334155',
+      color: '#94a3b8'
+    }
+  }, "\uD83D\uDCD6 \uAC00\uC774\uB4DC"), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => setPage('mypage'),
     color: "outline",
     sm: true,
@@ -4148,7 +4152,7 @@ function ProductsPage() {
       ...btnStyle('outline', true),
       cursor: 'pointer'
     }
-  }, "\uD83D\uDCC2 \uC5D1\uC140/CSV \uAC00\uC838\uC624\uAE30", /*#__PURE__*/React.createElement("input", {
+  }, "\uD83D\uDCE4 \uC5D1\uC140 \uC5C5\uB85C\uB4DC", /*#__PURE__*/React.createElement("input", {
     type: "file",
     accept: ".xlsx,.xls,.csv",
     onChange: handleFileImport,
@@ -4196,7 +4200,7 @@ function ProductsPage() {
     },
     color: "outline",
     sm: true
-  }, "\uD83D\uDCC4 \uC5D1\uC140")))), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCE5 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC")))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -4967,7 +4971,7 @@ function StockPage() {
       showToast('✅ 엑셀 다운로드!');
     },
     color: "outline"
-  }, "\uD83D\uDCC4 \uC5D1\uC140"))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(CardHead, {
+  }, "\uD83D\uDCE5 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC"))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(CardHead, {
     left: "\uC7AC\uACE0 \uD604\uD669",
     right: /*#__PURE__*/React.createElement("span", {
       style: {
@@ -6505,10 +6509,6 @@ function SalesPage() {
       gap: 8
     }
   }, /*#__PURE__*/React.createElement(Btn, {
-    onClick: exportExcel,
-    color: "outline",
-    sm: true
-  }, "\uD83D\uDCCA \uC5D1\uC140 \uB2E4\uC6B4"), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       const rows = filtered.map(s => `<tr><td>${s.date}</td><td>${s.partner}</td><td>${s.country || '-'}</td><td>${s.item || '-'}</td><td class="amount">${won(s.supply)}</td><td class="amount">${won(s.vat)}</td><td class="amount" style="font-weight:700;color:#15803d">${won(s.total)}</td><td class="center"><span class="tag ${s.taxType === '영세율' ? 'tag-blue' : s.taxType === '부가세별도' ? 'tag-orange' : 'tag-gray'}">${s.taxType || '부가세포함'}</span></td><td class="center"><span class="tag ${s.collected ? 'tag-green' : 'tag-orange'}">${s.status === '취소' ? '취소' : s.collected ? '✅ 수금완료' : '⏳ 미수'}</span></td></tr>`).join('');
       showToast('📄 PDF 기능은 준비 중입니다', '#1d4ed8');
@@ -6553,7 +6553,7 @@ function SalesPage() {
       showToast('✅ 엑셀 다운로드!');
     },
     color: "outline"
-  }, "\uD83D\uDCC4 \uC5D1\uC140"))), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCE5 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 6,
@@ -7420,11 +7420,7 @@ function PurchasePage() {
       fontSize: 11,
       color: '#94a3b8'
     }
-  }, "\uC804\uCCB4 ", purchases.length, "\uAC74 \xB7 \uC870\uD68C ", filtered.length, "\uAC74")), /*#__PURE__*/React.createElement(Btn, {
-    onClick: exportExcel,
-    color: "outline",
-    sm: true
-  }, "\uD83D\uDCCA \uC5D1\uC140 \uB2E4\uC6B4"), editable && /*#__PURE__*/React.createElement(Btn, {
+  }, "\uC804\uCCB4 ", purchases.length, "\uAC74 \xB7 \uC870\uD68C ", filtered.length, "\uAC74")), editable && /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       setEditTarget(null);
       setForm({
@@ -7461,7 +7457,7 @@ function PurchasePage() {
       showToast('✅ 엑셀 다운로드!');
     },
     color: "outline"
-  }, "\uD83D\uDCC4 \uC5D1\uC140"))), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCE5 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -8538,7 +8534,7 @@ function PaymentPage() {
       showToast('✅ 엑셀 다운로드!');
     },
     color: "outline"
-  }, "\uD83D\uDCC4 \uC5D1\uC140")), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCE5 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: 'repeat(3,1fr)',
@@ -8956,7 +8952,7 @@ function TaxPage() {
       showToast('✅ 엑셀 다운로드!');
     },
     color: "outline"
-  }, "\uD83D\uDCC4 \uC5D1\uC140")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
+  }, "\uD83D\uDCE5 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
     heads: ['발행일', '문서번호', '공급받는자', '사업자번호', '품목', '공급가액', '세액', '합계', '유형', editable ? '' : ''].filter(Boolean),
     empty: "\uC138\uAE08\uACC4\uC0B0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
     rows: [...taxInvoices].filter(t => showCanceledT || t.status !== '취소').reverse().map((t, i) => /*#__PURE__*/React.createElement("tr", {
@@ -10253,7 +10249,7 @@ function BuyersPage() {
       showToast('✅ 엑셀 다운로드!');
     },
     color: "outline"
-  }, "\uD83D\uDCC4 \uC5D1\uC140"))), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCE5 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC"))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10
     }
