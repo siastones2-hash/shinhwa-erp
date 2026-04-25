@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1631 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1656 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -503,6 +503,90 @@ const downloadCSV = (rows, filename) => {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
+
+// ===== 통일된 엑셀 Import 헬퍼 =====
+// 엑셀/CSV 파일을 읽어서 행 배열로 반환
+const readExcelOrCSV = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      reader.onload = ev => {
+        try {
+          const XLSX = window.XLSX;
+          if (!XLSX) {
+            reject(new Error('엑셀 라이브러리 로딩 중... 2~3초 후 다시 시도'));
+            return;
+          }
+          const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          resolve(rows);
+        } catch (err) { reject(err); }
+      };
+      reader.readAsArrayBuffer(file);
+    } else if (file.name.endsWith('.csv')) {
+      reader.onload = ev => {
+        try {
+          const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim());
+          const rows = lines.map(line => line.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
+          resolve(rows);
+        } catch (err) { reject(err); }
+      };
+      reader.readAsText(file, 'utf-8');
+    } else {
+      reject(new Error('엑셀(.xlsx/.xls) 또는 CSV 파일만 가능'));
+    }
+  });
+};
+
+// 헤더 인덱스 찾기 (다양한 컬럼명 지원)
+const findColumnIdx = (headers, ...candidates) => {
+  const lower = headers.map(h => String(h || '').trim().toLowerCase());
+  for (const c of candidates) {
+    const idx = lower.findIndex(h => h.includes(c.toLowerCase()));
+    if (idx >= 0) return idx;
+  }
+  return -1;
+};
+
+// 숫자 추출 (콤마, 통화기호 제거)
+const parseNumber = (v) => {
+  if (v === null || v === undefined || v === '') return 0;
+  const num = Number(String(v).replace(/[^0-9.-]/g, '')) || 0;
+  return num;
+};
+
+// 날짜 정규화 (YYYY-MM-DD 형식으로)
+const parseDate = (v) => {
+  if (!v) return '';
+  const s = String(v).trim();
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
+    const [y,m,d] = s.split('-');
+    return y + '-' + m.padStart(2,'0') + '-' + d.padStart(2,'0');
+  }
+  // YYYY/MM/DD or YYYY.MM.DD
+  if (/^\d{4}[\/.\-]\d{1,2}[\/.\-]\d{1,2}$/.test(s)) {
+    const parts = s.split(/[\/.\-]/);
+    return parts[0] + '-' + parts[1].padStart(2,'0') + '-' + parts[2].padStart(2,'0');
+  }
+  // 엑셀 날짜 시리얼 (숫자)
+  if (/^\d+$/.test(s) && Number(s) > 25569) {
+    const date = new Date((Number(s) - 25569) * 86400000);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().slice(0, 10);
+    }
+  }
+  // Date 파싱 시도
+  try {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().slice(0, 10);
+    }
+  } catch (e) {}
+  return s; // 인식 못 하면 원본 반환
+};
+
 // JSON 백업 다운로드 (전체 데이터)
 const downloadBackup = data => {
   const json = JSON.stringify(data, null, 2);
@@ -570,6 +654,10 @@ const MENUS = [{
   id: 'schedule',
   label: '스케줄',
   icon: '📅'
+}, {
+  id: 'help',
+  label: '사용 가이드',
+  icon: '📖'
 }];
 const INIT_USERS = [{
   id: 'u001',
@@ -2231,6 +2319,8 @@ function App() {
   }, [user]);
   const canView = menuId => {
     if (!user) return false;
+    // 도움말은 모든 로그인 사용자 접근 가능
+    if (menuId === 'help') return true;
     // 대표는 무조건 모든 권한
     if (user.role === 'ceo') return true;
     // 관리자/전무는 모든 권한 자동 (대표가 명시적으로 false 설정한 경우만 차단)
@@ -2663,7 +2753,7 @@ function App() {
       padding: 20,
       minWidth: 0
     }
-  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && user && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CbmPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), 
+  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && user && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CbmPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), page === 'help' && /*#__PURE__*/React.createElement(HelpPage, null), 
     // 권한 차단 안내 (페이지는 매칭되는데 canView가 false인 경우)
     ['products','stock','sales','purchase','receipt','payment','tax','quote','buyers','pricelist','schedule','invoice'].includes(page) && !canView(page) && /*#__PURE__*/React.createElement("div", {
       style: { padding: 40, textAlign: 'center' }
@@ -2671,7 +2761,7 @@ function App() {
       style: { fontSize: 16, color: '#dc2626', fontWeight: 700, marginBottom: 8 }
     }, "🔒 이 메뉴를 볼 권한이 없습니다"), /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 12, color: '#94a3b8' }
-    }, "대표에게 권한을 요청하세요")), !['dash','products','stock','sales','purchase','receipt','payment','tax','quote','buyers','buyer_detail','cashbook','profitloss','approval','pricelist','report','schedule','cbm','invoice','bizreport','annex','users','mypage'].includes(page) && /*#__PURE__*/React.createElement("div", {
+    }, "대표에게 권한을 요청하세요")), !['dash','products','stock','sales','purchase','receipt','payment','tax','quote','buyers','buyer_detail','cashbook','profitloss','approval','pricelist','report','schedule','cbm','invoice','bizreport','annex','users','mypage','help'].includes(page) && /*#__PURE__*/React.createElement("div", {
     style: { padding: 40, textAlign: 'center', color: '#94a3b8' }
   }, "\uD398\uC774\uC9C0\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uB300\uC2DC\uBCF4\uB4DC\uB85C \uB3CC\uC544\uAC00\uC138\uC694."))), /*#__PURE__*/React.createElement("div", {
     className: "mobile-bottom-nav",
@@ -6007,6 +6097,132 @@ function SalesPage() {
     syncDB,
     pricelist
   } = useAuth();
+  // 📤 매출 엑셀 일괄 등록
+  const [importSalesModal, setImportSalesModal] = useState(false);
+  const [importSalesPreview, setImportSalesPreview] = useState([]);
+  
+  const parseSalesExcel = (rows) => {
+    if (!rows || rows.length === 0) return [];
+    const headers = rows[0];
+    const idxDate = findColumnIdx(headers, '날짜', 'date', '일자', '거래일');
+    const idxPartner = findColumnIdx(headers, '거래처', 'partner', 'buyer', '고객');
+    const idxItem = findColumnIdx(headers, '품목', 'item', '상품명', '제품');
+    const idxQty = findColumnIdx(headers, '수량', 'qty', 'quantity');
+    const idxSupply = findColumnIdx(headers, '공급가', 'supply', '공급가액');
+    const idxVat = findColumnIdx(headers, '부가세', 'vat', '세액');
+    const idxTotal = findColumnIdx(headers, '합계', 'total', '총액', '금액');
+    const idxNote = findColumnIdx(headers, '비고', 'note', 'memo', '메모');
+    
+    if (idxPartner < 0) {
+      showToast('헤더에 \'거래처\' 컬럼이 필요합니다', '#dc2626');
+      return [];
+    }
+    
+    const result = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+      const partner = String(row[idxPartner] || '').trim();
+      if (!partner) continue;
+      
+      // 자동 매칭
+      const matchedBuyer = (buyers || []).find(b => (b.name || '').trim() === partner);
+      const itemName = idxItem >= 0 ? String(row[idxItem] || '').trim() : '';
+      const matchedProduct = itemName && (products || []).find(p => 
+        (p.ko || '').trim() === itemName || (p.en || '').trim() === itemName
+      );
+      
+      const qty = parseNumber(idxQty >= 0 ? row[idxQty] : 1) || 1;
+      const supply = parseNumber(idxSupply >= 0 ? row[idxSupply] : 0);
+      const vat = parseNumber(idxVat >= 0 ? row[idxVat] : 0);
+      let total = parseNumber(idxTotal >= 0 ? row[idxTotal] : 0);
+      // total이 비어있으면 supply + vat로 계산
+      if (total === 0 && supply > 0) total = supply + vat;
+      // supply도 0이면 스킵 (의미 없는 데이터)
+      if (total === 0 && supply === 0) continue;
+      
+      result.push({
+        id: Date.now() + Math.random() + i,
+        date: parseDate(idxDate >= 0 ? row[idxDate] : todayStr()) || todayStr(),
+        partner: partner,
+        country: matchedBuyer ? (matchedBuyer.country || '') : '',
+        item: itemName,
+        productId: matchedProduct ? matchedProduct.id : '',
+        qty: qty,
+        supply: supply,
+        vat: vat,
+        total: total,
+        taxType: '부가세포함',
+        note: idxNote >= 0 ? String(row[idxNote] || '') : '엑셀 일괄 등록',
+        collected: false,
+        docNo: 'SAL-IMP-' + (Date.now() + i)
+      });
+    }
+    return result;
+  };
+  
+  const handleSalesImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const rows = await readExcelOrCSV(file);
+      const parsed = parseSalesExcel(rows);
+      if (parsed.length > 0) {
+        setImportSalesPreview(parsed);
+        setImportSalesModal(true);
+      } else {
+        showToast('매출 데이터를 찾을 수 없습니다', '#dc2626');
+      }
+    } catch (err) {
+      showToast('파싱 오류: ' + err.message, '#dc2626');
+    }
+    e.target.value = '';
+  };
+  
+  const confirmSalesImport = () => {
+    // 추가 (replace는 위험하므로 추가만)
+    const merged = [...(sales || []), ...importSalesPreview];
+    setSales(merged);
+    importSalesPreview.forEach(s => {
+      if (syncDB.sale) syncDB.sale(s);
+      // 매출에 따른 미수금 자동 생성
+      if (s.total > 0 && setReceipts) {
+        const recExpDate = new Date(s.date);
+        recExpDate.setDate(recExpDate.getDate() + 30);
+        const newRec = {
+          id: Date.now() + Math.random(),
+          date: s.date,
+          partner: s.partner,
+          item: s.item || '',
+          billed: s.total,
+          received: 0,
+          method: '',
+          expectedDate: recExpDate.toISOString().slice(0, 10),
+          note: '매출 일괄 등록 자동 생성 (' + s.docNo + ')',
+          salesId: s.id,
+          fromSaleId: s.id,
+          linkedSaleId: s.id,
+          autoGenerated: true,
+          status: '미수'
+        };
+        setReceipts(prev => [...(prev || []), newRec]);
+        if (syncDB.receipt) syncDB.receipt(newRec);
+      }
+    });
+    showToast('✅ ' + importSalesPreview.length + '건 매출 등록 + 미수금 자동 생성!');
+    setImportSalesModal(false);
+    setImportSalesPreview([]);
+  };
+  
+  const downloadSalesTemplate = () => {
+    const sample = [
+      { '날짜': '2026-04-25', '거래처': '㈜샘플상사', '품목': '폭풍떡볶이 컵', '수량': 100, '공급가': 189200, '부가세': 18920, '합계': 208120, '비고': '4월 정기 납품' },
+      { '날짜': '2026-04-26', '거래처': 'ABC Trading', '품목': 'Spicy Cup', '수량': 200, '공급가': 500, '부가세': 0, '합계': 500, '비고': '수출' }
+    ];
+    downloadCSV(sample, '매출_업로드_템플릿');
+    showToast('✅ 매출 템플릿 다운로드!');
+  };
+
   const [modal, setModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [countryFilter, setCountryFilter] = useState('');
@@ -6282,7 +6498,29 @@ function SalesPage() {
       });
       setModal(true);
     }
-  }, "\u271A \uB9E4\uCD9C \uB4F1\uB85D"), /*#__PURE__*/React.createElement(Btn, {
+  }, "\u271A \uB9E4\uCD9C \uB4F1\uB85D"), user.role !== 'staff' && /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 4,
+      padding: '8px 12px',
+      background: '#15803d',
+      color: '#fff',
+      borderRadius: 6,
+      cursor: 'pointer',
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "📤 엑셀 업로드", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".xlsx,.xls,.csv",
+    onChange: handleSalesImport,
+    style: { display: 'none' }
+  })), user.role !== 'staff' && /*#__PURE__*/React.createElement(Btn, {
+    onClick: downloadSalesTemplate,
+    color: "outline",
+    sm: true
+  }, "📋 템플릿"), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       const exportRows = filtered.map(s => ({
         '날짜': s.date || '',
@@ -6778,7 +7016,40 @@ function SalesPage() {
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save,
     color: "green"
-  }, user.role === 'staff' ? '✅ 승인 요청' : '✅ 등록'))));
+  }, user.role === 'staff' ? '✅ 승인 요청' : '✅ 등록')))), importSalesModal && /*#__PURE__*/React.createElement(Modal, {
+    title: '📤 매출 일괄 등록 - 미리보기',
+    onClose: () => { setImportSalesModal(false); setImportSalesPreview([]); }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12, padding: 12, background: '#eff6ff', borderRadius: 8, border: '1px solid #93c5fd' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 4 }
+  }, "✅ ", importSalesPreview.length, "건의 매출 데이터 인식"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, color: '#64748b' }
+  }, "등록 시 미수금이 자동으로 생성됩니다 (입금예정일: 매출일+30일).")), /*#__PURE__*/React.createElement("div", {
+    style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
+  }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['날짜', '거래처', '품목', '수량', '합계'].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, importSalesPreview.slice(0, 50).map((s, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i,
+    style: { borderBottom: '1px solid #f1f5f9' }
+  }, /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, s.date),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, s.partner),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, s.item || '-'),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right' } }, s.qty),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 } }, won(s.total)))))), importSalesPreview.length > 50 && /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: 'center', color: '#94a3b8', fontSize: 11, marginBottom: 8 }
+  }, "(50건만 미리보기 - 실제로는 ", importSalesPreview.length, "건 등록)"), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => { setImportSalesModal(false); setImportSalesPreview([]); },
+    color: 'outline'
+  }, "취소"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: confirmSalesImport,
+    color: 'blue'
+  }, "➕ ", importSalesPreview.length, "건 모두 등록"))));
 }
 function PurchasePage() {
   const {
@@ -6797,6 +7068,128 @@ function PurchasePage() {
     user,
     requestApproval
   } = useAuth();
+  // 📤 매입 엑셀 일괄 등록
+  const [importPurchModal, setImportPurchModal] = useState(false);
+  const [importPurchPreview, setImportPurchPreview] = useState([]);
+  
+  const parsePurchaseExcel = (rows) => {
+    if (!rows || rows.length === 0) return [];
+    const headers = rows[0];
+    const idxDate = findColumnIdx(headers, '날짜', 'date', '일자', '거래일');
+    const idxPartner = findColumnIdx(headers, '거래처', 'partner', 'supplier', '공급처');
+    const idxItem = findColumnIdx(headers, '품목', 'item', '상품명', '제품');
+    const idxQty = findColumnIdx(headers, '수량', 'qty', 'quantity');
+    const idxSupply = findColumnIdx(headers, '공급가', 'supply', '공급가액');
+    const idxVat = findColumnIdx(headers, '부가세', 'vat', '세액');
+    const idxTotal = findColumnIdx(headers, '합계', 'total', '총액', '금액');
+    const idxNote = findColumnIdx(headers, '비고', 'note', 'memo', '메모');
+    
+    if (idxPartner < 0) {
+      showToast('헤더에 \'거래처\' 컬럼이 필요합니다', '#dc2626');
+      return [];
+    }
+    
+    const result = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+      const partner = String(row[idxPartner] || '').trim();
+      if (!partner) continue;
+      
+      const matchedBuyer = (buyers || []).find(b => (b.name || '').trim() === partner);
+      const itemName = idxItem >= 0 ? String(row[idxItem] || '').trim() : '';
+      const matchedProduct = itemName && (products || []).find(p => 
+        (p.ko || '').trim() === itemName || (p.en || '').trim() === itemName
+      );
+      
+      const qty = parseNumber(idxQty >= 0 ? row[idxQty] : 1) || 1;
+      const supply = parseNumber(idxSupply >= 0 ? row[idxSupply] : 0);
+      const vat = parseNumber(idxVat >= 0 ? row[idxVat] : 0);
+      let total = parseNumber(idxTotal >= 0 ? row[idxTotal] : 0);
+      if (total === 0 && supply > 0) total = supply + vat;
+      if (total === 0 && supply === 0) continue;
+      
+      result.push({
+        id: Date.now() + Math.random() + i,
+        date: parseDate(idxDate >= 0 ? row[idxDate] : todayStr()) || todayStr(),
+        partner: partner,
+        country: matchedBuyer ? (matchedBuyer.country || '') : '',
+        item: itemName,
+        productId: matchedProduct ? matchedProduct.id : '',
+        qty: qty,
+        supply: supply,
+        vat: vat,
+        total: total,
+        taxType: '부가세포함',
+        note: idxNote >= 0 ? String(row[idxNote] || '') : '엑셀 일괄 등록',
+        paid: false,
+        docNo: 'PUR-IMP-' + (Date.now() + i)
+      });
+    }
+    return result;
+  };
+  
+  const handlePurchImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const rows = await readExcelOrCSV(file);
+      const parsed = parsePurchaseExcel(rows);
+      if (parsed.length > 0) {
+        setImportPurchPreview(parsed);
+        setImportPurchModal(true);
+      } else {
+        showToast('매입 데이터를 찾을 수 없습니다', '#dc2626');
+      }
+    } catch (err) {
+      showToast('파싱 오류: ' + err.message, '#dc2626');
+    }
+    e.target.value = '';
+  };
+  
+  const confirmPurchImport = () => {
+    const merged = [...(purchases || []), ...importPurchPreview];
+    setPurchases(merged);
+    importPurchPreview.forEach(p => {
+      if (syncDB.purchase) syncDB.purchase(p);
+      // 매입 → 미지급 자동 생성
+      if (p.total > 0 && setPayments) {
+        const expDate = new Date(p.date);
+        expDate.setDate(expDate.getDate() + 30);
+        const newPay = {
+          id: Date.now() + Math.random(),
+          date: p.date,
+          partner: p.partner,
+          item: p.item || '',
+          billed: p.total,
+          paid: 0,
+          method: '',
+          expectedDate: expDate.toISOString().slice(0, 10),
+          note: '매입 일괄 등록 자동 생성 (' + p.docNo + ')',
+          purchaseId: p.id,
+          fromPurchaseId: p.id,
+          linkedPurchaseId: p.id,
+          autoGenerated: true,
+          status: '미지급'
+        };
+        setPayments(prev => [...(prev || []), newPay]);
+        if (syncDB.payment) syncDB.payment(newPay);
+      }
+    });
+    showToast('✅ ' + importPurchPreview.length + '건 매입 등록 + 미지급 자동 생성!');
+    setImportPurchModal(false);
+    setImportPurchPreview([]);
+  };
+  
+  const downloadPurchTemplate = () => {
+    const sample = [
+      { '날짜': '2026-04-25', '거래처': '㈜원자재상사', '품목': '원료A', '수량': 1000, '공급가': 1000000, '부가세': 100000, '합계': 1100000, '비고': '월간 정기 매입' },
+      { '날짜': '2026-04-26', '거래처': 'XYZ Supplier', '품목': 'Material B', '수량': 500, '공급가': 5000, '부가세': 0, '합계': 5000, '비고': '수입' }
+    ];
+    downloadCSV(sample, '매입_업로드_템플릿');
+    showToast('✅ 매입 템플릿 다운로드!');
+  };
+
   const [modal, setModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [searchText, setSearchText] = useState('');
@@ -7068,7 +7461,29 @@ function PurchasePage() {
       });
       setModal(true);
     }
-  }, "\u271A \uB9E4\uC785 \uB4F1\uB85D"), /*#__PURE__*/React.createElement(Btn, {
+  }, "\u271A \uB9E4\uC785 \uB4F1\uB85D"), user.role !== 'staff' && /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 4,
+      padding: '8px 12px',
+      background: '#15803d',
+      color: '#fff',
+      borderRadius: 6,
+      cursor: 'pointer',
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "📤 엑셀 업로드", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".xlsx,.xls,.csv",
+    onChange: handlePurchImport,
+    style: { display: 'none' }
+  })), user.role !== 'staff' && /*#__PURE__*/React.createElement(Btn, {
+    onClick: downloadPurchTemplate,
+    color: "outline",
+    sm: true
+  }, "📋 템플릿"), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       const exportRows = filtered.map(p => ({
         '날짜': p.date || '',
@@ -7481,7 +7896,40 @@ function PurchasePage() {
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save,
     color: "orange"
-  }, "\u2705 ", editTarget ? '수정' : '등록'))));
+  }, "\u2705 ", editTarget ? '수정' : '등록')))), importPurchModal && /*#__PURE__*/React.createElement(Modal, {
+    title: '📤 매입 일괄 등록 - 미리보기',
+    onClose: () => { setImportPurchModal(false); setImportPurchPreview([]); }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12, padding: 12, background: '#fff7ed', borderRadius: 8, border: '1px solid #fed7aa' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, fontWeight: 700, color: '#c2410c', marginBottom: 4 }
+  }, "✅ ", importPurchPreview.length, "건의 매입 데이터 인식"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, color: '#64748b' }
+  }, "등록 시 미지급금이 자동 생성됩니다 (지급예정일: 매입일+30일).")), /*#__PURE__*/React.createElement("div", {
+    style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
+  }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['날짜', '거래처', '품목', '수량', '합계'].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, importPurchPreview.slice(0, 50).map((p, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i,
+    style: { borderBottom: '1px solid #f1f5f9' }
+  }, /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, p.date),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, p.partner),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, p.item || '-'),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right' } }, p.qty),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 } }, won(p.total)))))), importPurchPreview.length > 50 && /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: 'center', color: '#94a3b8', fontSize: 11, marginBottom: 8 }
+  }, "(50건만 미리보기 - 실제로는 ", importPurchPreview.length, "건 등록)"), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => { setImportPurchModal(false); setImportPurchPreview([]); },
+    color: 'outline'
+  }, "취소"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: confirmPurchImport,
+    color: 'orange'
+  }, "➕ ", importPurchPreview.length, "건 모두 등록"))));
 }
 function ReceiptPage() {
   const ctx = useAuth();
@@ -7507,6 +7955,101 @@ function ReceiptPage() {
     receiptFilter,
     setReceiptFilter = () => {}
   } = ctx;
+  // 📤 수금 엑셀 일괄 등록
+  const [importRecpModal, setImportRecpModal] = useState(false);
+  const [importRecpPreview, setImportRecpPreview] = useState([]);
+  
+  const parseReceiptExcel = (rows) => {
+    if (!rows || rows.length === 0) return [];
+    const headers = rows[0];
+    const idxDate = findColumnIdx(headers, '날짜', 'date', '일자', '입금일');
+    const idxPartner = findColumnIdx(headers, '거래처', 'partner', '고객');
+    const idxItem = findColumnIdx(headers, '품목', 'item', '내역');
+    const idxBilled = findColumnIdx(headers, '청구', 'billed', '청구액');
+    const idxReceived = findColumnIdx(headers, '수금', 'received', '수금액', '입금액');
+    const idxMethod = findColumnIdx(headers, '결제수단', 'method', '결제', '입금방법');
+    const idxExpected = findColumnIdx(headers, '입금예정', 'expected', '예정일');
+    const idxNote = findColumnIdx(headers, '비고', 'note', 'memo', '메모');
+    
+    if (idxPartner < 0) {
+      showToast('헤더에 \'거래처\' 컬럼이 필요합니다', '#dc2626');
+      return [];
+    }
+    
+    const result = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+      const partner = String(row[idxPartner] || '').trim();
+      if (!partner) continue;
+      
+      const billed = parseNumber(idxBilled >= 0 ? row[idxBilled] : 0);
+      const received = parseNumber(idxReceived >= 0 ? row[idxReceived] : 0);
+      if (billed === 0 && received === 0) continue;
+      
+      const status = received >= billed && billed > 0 ? '완료' : (received > 0 ? '부분수금' : '미수');
+      
+      result.push({
+        id: Date.now() + Math.random() + i,
+        date: parseDate(idxDate >= 0 ? row[idxDate] : todayStr()) || todayStr(),
+        partner: partner,
+        item: idxItem >= 0 ? String(row[idxItem] || '').trim() : '',
+        billed: billed,
+        received: received,
+        method: idxMethod >= 0 ? String(row[idxMethod] || '').trim() : '',
+        expectedDate: parseDate(idxExpected >= 0 ? row[idxExpected] : ''),
+        note: idxNote >= 0 ? String(row[idxNote] || '엑셀 일괄 등록') : '엑셀 일괄 등록',
+        status: status,
+        docNo: 'RCP-IMP-' + (Date.now() + i)
+      });
+    }
+    return result;
+  };
+  
+  const handleRecpImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const rows = await readExcelOrCSV(file);
+      const parsed = parseReceiptExcel(rows);
+      if (parsed.length > 0) {
+        setImportRecpPreview(parsed);
+        setImportRecpModal(true);
+      } else {
+        showToast('수금 데이터를 찾을 수 없습니다', '#dc2626');
+      }
+    } catch (err) {
+      showToast('파싱 오류: ' + err.message, '#dc2626');
+    }
+    e.target.value = '';
+  };
+  
+  const confirmRecpImport = () => {
+    const merged = [...(receipts || []), ...importRecpPreview];
+    setReceipts(merged);
+    importRecpPreview.forEach(r => {
+      if (syncDB.receipt) syncDB.receipt(r);
+      // 수금이 있다면 매출 collected 자동 업데이트
+      if (r.received >= r.billed && r.billed > 0 && setSales) {
+        setSales(prev => (prev || []).map(s => 
+          s.partner === r.partner && !s.collected ? { ...s, collected: true } : s
+        ));
+      }
+    });
+    showToast('✅ ' + importRecpPreview.length + '건 수금 등록!');
+    setImportRecpModal(false);
+    setImportRecpPreview([]);
+  };
+  
+  const downloadRecpTemplate = () => {
+    const sample = [
+      { '날짜': '2026-04-25', '거래처': '㈜샘플상사', '품목': '4월 매출분', '청구': 1000000, '수금': 1000000, '결제수단': '계좌이체', '입금예정': '2026-04-25', '비고': '완료' },
+      { '날짜': '2026-04-26', '거래처': 'ABC Trading', '품목': '수출분', '청구': 5000, '수금': 0, '결제수단': 'T/T', '입금예정': '2026-05-25', '비고': 'L/C 30일' }
+    ];
+    downloadCSV(sample, '수금_업로드_템플릿');
+    showToast('✅ 수금 템플릿 다운로드!');
+  };
+
   const [partnerFilter, setPartnerFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -7694,7 +8237,13 @@ function ReceiptPage() {
     }, /*#__PURE__*/React.createElement(Btn, {
       onClick: exportExcel,
       color: 'outline'
-    }, "📄 엑셀"), editable && /*#__PURE__*/React.createElement(Btn, {
+    }, "📄 엑셀"), user && user.role !== 'staff' && /*#__PURE__*/React.createElement("label", {
+      style: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 12px', background: '#15803d', color: '#fff', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600 }
+    }, "📤 엑셀 업로드", /*#__PURE__*/React.createElement("input", {
+      type: "file", accept: ".xlsx,.xls,.csv", onChange: handleRecpImport, style: { display: 'none' }
+    })), user && user.role !== 'staff' && /*#__PURE__*/React.createElement(Btn, {
+      onClick: downloadRecpTemplate, color: 'outline'
+    }, "📋 템플릿"), editable && /*#__PURE__*/React.createElement(Btn, {
       onClick: () => {
         setForm({ date: todayStr(), partner: '', item: '', billed: '', received: '', method: '', expectedDate: '', note: '' });
         setModal(true);
@@ -7832,7 +8381,39 @@ function ReceiptPage() {
         /*#__PURE__*/React.createElement(Input, { value: form.note, onChange: v => setForm(f => ({ ...f, note: v })), placeholder: '메모' })),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 } },
         /*#__PURE__*/React.createElement(Btn, { onClick: () => setModal(false), color: 'outline' }, '취소'),
-        /*#__PURE__*/React.createElement(Btn, { onClick: save }, '✅ 저장'))))
+        /*#__PURE__*/React.createElement(Btn, { onClick: save }, '✅ 저장')))),
+    importRecpModal && /*#__PURE__*/React.createElement(Modal, {
+      title: '📤 수금 일괄 등록 - 미리보기',
+      onClose: () => { setImportRecpModal(false); setImportRecpPreview([]); }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { marginBottom: 12, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 13, fontWeight: 700, color: '#166534', marginBottom: 4 }
+    }, "✅ ", importRecpPreview.length, "건의 수금 데이터 인식"), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, color: '#64748b' }
+    }, "전액 수금된 건은 매출의 '수금완료' 자동 체크됩니다.")), /*#__PURE__*/React.createElement("div", {
+      style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
+    }, /*#__PURE__*/React.createElement("table", {
+      style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
+    }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['날짜', '거래처', '청구', '수금', '상태'].map(h => /*#__PURE__*/React.createElement("th", {
+      key: h,
+      style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
+    }, h)))), /*#__PURE__*/React.createElement("tbody", null, importRecpPreview.slice(0, 50).map((r, i) => /*#__PURE__*/React.createElement("tr", {
+      key: i,
+      style: { borderBottom: '1px solid #f1f5f9' }
+    }, /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, r.date),
+       /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, r.partner),
+       /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace' } }, won(r.billed)),
+       /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace', color: '#15803d', fontWeight: 700 } }, won(r.received)),
+       /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, r.status))))), /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }
+    }, /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => { setImportRecpModal(false); setImportRecpPreview([]); },
+      color: 'outline'
+    }, "취소"), /*#__PURE__*/React.createElement(Btn, {
+      onClick: confirmRecpImport,
+      color: 'blue'
+    }, "➕ ", importRecpPreview.length, "건 모두 등록"))))
   );
 }
 
@@ -7848,6 +8429,101 @@ function PaymentPage() {
     requestApproval,
     buyers
   } = useAuth();
+  // 📤 지급 엑셀 일괄 등록
+  const [importPayModal, setImportPayModal] = useState(false);
+  const [importPayPreview, setImportPayPreview] = useState([]);
+  
+  const parsePaymentExcel = (rows) => {
+    if (!rows || rows.length === 0) return [];
+    const headers = rows[0];
+    const idxDate = findColumnIdx(headers, '날짜', 'date', '일자', '지급일');
+    const idxPartner = findColumnIdx(headers, '거래처', 'partner', '공급처');
+    const idxItem = findColumnIdx(headers, '품목', 'item', '내역');
+    const idxBilled = findColumnIdx(headers, '청구', 'billed', '청구액');
+    const idxPaid = findColumnIdx(headers, '지급', 'paid', '지급액', '출금액');
+    const idxMethod = findColumnIdx(headers, '결제수단', 'method', '결제', '지급방법');
+    const idxExpected = findColumnIdx(headers, '지급예정', 'expected', '예정일');
+    const idxNote = findColumnIdx(headers, '비고', 'note', 'memo', '메모');
+    
+    if (idxPartner < 0) {
+      showToast('헤더에 \'거래처\' 컬럼이 필요합니다', '#dc2626');
+      return [];
+    }
+    
+    const result = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+      const partner = String(row[idxPartner] || '').trim();
+      if (!partner) continue;
+      
+      const billed = parseNumber(idxBilled >= 0 ? row[idxBilled] : 0);
+      const paid = parseNumber(idxPaid >= 0 ? row[idxPaid] : 0);
+      if (billed === 0 && paid === 0) continue;
+      
+      const status = paid >= billed && billed > 0 ? '완료' : (paid > 0 ? '부분지급' : '미지급');
+      
+      result.push({
+        id: Date.now() + Math.random() + i,
+        date: parseDate(idxDate >= 0 ? row[idxDate] : todayStr()) || todayStr(),
+        partner: partner,
+        item: idxItem >= 0 ? String(row[idxItem] || '').trim() : '',
+        billed: billed,
+        paid: paid,
+        method: idxMethod >= 0 ? String(row[idxMethod] || '').trim() : '',
+        expectedDate: parseDate(idxExpected >= 0 ? row[idxExpected] : ''),
+        note: idxNote >= 0 ? String(row[idxNote] || '엑셀 일괄 등록') : '엑셀 일괄 등록',
+        status: status,
+        docNo: 'PAY-IMP-' + (Date.now() + i)
+      });
+    }
+    return result;
+  };
+  
+  const handlePayImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const rows = await readExcelOrCSV(file);
+      const parsed = parsePaymentExcel(rows);
+      if (parsed.length > 0) {
+        setImportPayPreview(parsed);
+        setImportPayModal(true);
+      } else {
+        showToast('지급 데이터를 찾을 수 없습니다', '#dc2626');
+      }
+    } catch (err) {
+      showToast('파싱 오류: ' + err.message, '#dc2626');
+    }
+    e.target.value = '';
+  };
+  
+  const confirmPayImport = () => {
+    const merged = [...(payments || []), ...importPayPreview];
+    setPayments(merged);
+    importPayPreview.forEach(p => {
+      if (syncDB.payment) syncDB.payment(p);
+      // 지급 완료 시 매입 paid 자동 업데이트
+      if (p.paid >= p.billed && p.billed > 0 && setPurchases) {
+        setPurchases(prev => (prev || []).map(s => 
+          s.partner === p.partner && !s.paid ? { ...s, paid: true } : s
+        ));
+      }
+    });
+    showToast('✅ ' + importPayPreview.length + '건 지급 등록!');
+    setImportPayModal(false);
+    setImportPayPreview([]);
+  };
+  
+  const downloadPayTemplate = () => {
+    const sample = [
+      { '날짜': '2026-04-25', '거래처': '㈜원자재상사', '품목': '4월 매입분', '청구': 1100000, '지급': 1100000, '결제수단': '계좌이체', '지급예정': '2026-04-25', '비고': '완료' },
+      { '날짜': '2026-04-26', '거래처': 'XYZ Supplier', '품목': '수입 자재', '청구': 5000, '지급': 0, '결제수단': 'T/T', '지급예정': '2026-05-25', '비고': '예정' }
+    ];
+    downloadCSV(sample, '지급_업로드_템플릿');
+    showToast('✅ 지급 템플릿 다운로드!');
+  };
+
   const [partnerFilter, setPartnerFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -7947,7 +8623,13 @@ function PaymentPage() {
       });
       setModal(true);
     }
-  }, "\u271A \uC9C0\uAE09 \uB4F1\uB85D"), /*#__PURE__*/React.createElement(Btn, {
+  }, "\u271A \uC9C0\uAE09 \uB4F1\uB85D"), user.role !== 'staff' && /*#__PURE__*/React.createElement("label", {
+    style: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 12px', background: '#15803d', color: '#fff', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600 }
+  }, "📤 엑셀 업로드", /*#__PURE__*/React.createElement("input", {
+    type: "file", accept: ".xlsx,.xls,.csv", onChange: handlePayImport, style: { display: 'none' }
+  })), user.role !== 'staff' && /*#__PURE__*/React.createElement(Btn, {
+    onClick: downloadPayTemplate, color: "outline", sm: true
+  }, "📋 템플릿"), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       const exportRows = filteredPay.map(p => ({
         '날짜': p.date || '',
@@ -8241,7 +8923,38 @@ function PaymentPage() {
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save,
     color: "purple"
-  }, "\u2705 \uB4F1\uB85D"))));
+  }, "\u2705 \uB4F1\uB85D")))), importPayModal && /*#__PURE__*/React.createElement(Modal, {
+    title: '📤 지급 일괄 등록 - 미리보기',
+    onClose: () => { setImportPayModal(false); setImportPayPreview([]); }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12, padding: 12, background: '#faf5ff', borderRadius: 8, border: '1px solid #d8b4fe' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, fontWeight: 700, color: '#7c3aed', marginBottom: 4 }
+  }, "✅ ", importPayPreview.length, "건의 지급 데이터 인식"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, color: '#64748b' }
+  }, "전액 지급된 건은 매입의 '지급완료' 자동 체크됩니다.")), /*#__PURE__*/React.createElement("div", {
+    style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
+  }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['날짜', '거래처', '청구', '지급', '상태'].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, importPayPreview.slice(0, 50).map((p, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i,
+    style: { borderBottom: '1px solid #f1f5f9' }
+  }, /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, p.date),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, p.partner),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace' } }, won(p.billed)),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 700 } }, won(p.paid)),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, p.status))))), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => { setImportPayModal(false); setImportPayPreview([]); },
+    color: 'outline'
+  }, "취소"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: confirmPayImport,
+    color: 'purple'
+  }, "➕ ", importPayPreview.length, "건 모두 등록"))));
 }
 function TaxPage() {
   const {
@@ -9370,6 +10083,153 @@ function BuyersPage() {
     setSelectedBuyer,
     setPage
   } = useAuth();
+  // 📤 엑셀 일괄 등록
+  const [importModal, setImportModal] = useState(false);
+  const [importPreview, setImportPreview] = useState([]);
+  const [importMode, setImportMode] = useState('append'); // 'append' or 'replace'
+  
+  const parseBuyerExcel = (rows) => {
+    if (!rows || rows.length === 0) return [];
+    // 첫 번째 행 = 헤더
+    const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
+    // 헤더 매칭 - 한국어/영어 둘 다 지원
+    const findIdx = (...candidates) => {
+      for (const c of candidates) {
+        const idx = headers.findIndex(h => h.includes(c.toLowerCase()));
+        if (idx >= 0) return idx;
+      }
+      return -1;
+    };
+    const idxName = findIdx('거래처명', '거래처', 'name', '회사명', '업체명');
+    const idxEn = findIdx('영문', 'english', 'en');
+    const idxCountry = findIdx('국가', 'country');
+    const idxType = findIdx('구분', 'type', '내수', '수출');
+    const idxContact = findIdx('담당자', 'contact', '담당');
+    const idxEmail = findIdx('이메일', 'email', '메일');
+    const idxPhone = findIdx('전화', 'phone', '연락처', 'tel');
+    const idxAddress = findIdx('주소', 'address');
+    const idxPayment = findIdx('결제', 'payment', '거래조건');
+    const idxBizNo = findIdx('사업자', 'bizno', '사업자번호');
+    
+    if (idxName < 0) {
+      showToast('헤더에 \'거래처명\' 컬럼이 필요합니다', '#dc2626');
+      return [];
+    }
+    
+    const result = [];
+    let nextId = (buyers || []).reduce((max, b) => {
+      const n = parseInt((b.id || '').replace(/\D/g, '')) || 0;
+      return n > max ? n : max;
+    }, 0);
+    
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+      const name = String(row[idxName] || '').trim();
+      if (!name) continue;
+      
+      nextId++;
+      result.push({
+        id: 'B' + String(nextId).padStart(3, '0'),
+        name: name,
+        en: idxEn >= 0 ? String(row[idxEn] || '').trim() : '',
+        country: idxCountry >= 0 ? String(row[idxCountry] || '한국').trim() : '한국',
+        type: idxType >= 0 ? String(row[idxType] || '국내').trim() : '국내',
+        contact: idxContact >= 0 ? String(row[idxContact] || '').trim() : '',
+        email: idxEmail >= 0 ? String(row[idxEmail] || '').trim() : '',
+        phone: idxPhone >= 0 ? String(row[idxPhone] || '').trim() : '',
+        address: idxAddress >= 0 ? String(row[idxAddress] || '').trim() : '',
+        payment: idxPayment >= 0 ? String(row[idxPayment] || '현금').trim() : '현금',
+        bizNo: idxBizNo >= 0 ? String(row[idxBizNo] || '').trim() : ''
+      });
+    }
+    return result;
+  };
+  
+  const handleBuyerImport = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const XLSX = window.XLSX;
+          if (!XLSX) {
+            showToast('엑셀 라이브러리 로딩 중... 2~3초 후 다시 시도', '#ea580c');
+            return;
+          }
+          const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          const parsed = parseBuyerExcel(rows);
+          if (parsed.length > 0) {
+            setImportPreview(parsed);
+            setImportModal(true);
+          } else {
+            showToast('거래처 데이터를 찾을 수 없습니다', '#dc2626');
+          }
+        } catch (err) {
+          showToast('파싱 오류: ' + err.message, '#dc2626');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else if (file.name.endsWith('.csv')) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const text = ev.target.result;
+          const lines = text.split(/\r?\n/).filter(l => l.trim());
+          const rows = lines.map(line => line.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
+          const parsed = parseBuyerExcel(rows);
+          if (parsed.length > 0) {
+            setImportPreview(parsed);
+            setImportModal(true);
+          } else {
+            showToast('거래처 데이터를 찾을 수 없습니다', '#dc2626');
+          }
+        } catch (err) {
+          showToast('파싱 오류: ' + err.message, '#dc2626');
+        }
+      };
+      reader.readAsText(file, 'utf-8');
+    } else {
+      showToast('엑셀(.xlsx/.xls) 또는 CSV 파일만 가능합니다', '#ea580c');
+    }
+    e.target.value = '';
+  };
+  
+  const confirmBuyerImport = (mode) => {
+    if (mode === 'replace') {
+      setBuyers(importPreview);
+      if (syncDB && syncDB.buyers) syncDB.buyers(importPreview);
+      showToast('✅ ' + importPreview.length + '개 거래처로 전체 교체!');
+    } else {
+      // 중복 체크: 같은 이름이면 스킵
+      const existingNames = new Set((buyers || []).map(b => (b.name || '').trim()));
+      const newBuyers = importPreview.filter(b => !existingNames.has(b.name.trim()));
+      const merged = [...(buyers || []), ...newBuyers];
+      setBuyers(merged);
+      if (syncDB && syncDB.buyers) syncDB.buyers(merged);
+      showToast('✅ ' + newBuyers.length + '개 추가 (중복 ' + (importPreview.length - newBuyers.length) + '개 스킵)');
+    }
+    setImportModal(false);
+    setImportPreview([]);
+  };
+  
+  const downloadBuyerTemplate = () => {
+    const headers = ['거래처명', '영문', '국가', '구분', '담당자', '이메일', '전화', '주소', '결제조건', '사업자번호'];
+    const sample = [
+      ['㈜샘플상사', 'Sample Co', '한국', '국내', '홍길동', 'sample@test.com', '02-1234-5678', '서울시 강남구', '현금', '123-45-67890'],
+      ['ABC Trading', 'ABC Trading Ltd', '미국', '수출', 'John Doe', 'abc@test.com', '+1-123-456', 'New York', 'T/T 30days', '']
+    ];
+    downloadCSV([
+      Object.fromEntries(headers.map((h, i) => [h, sample[0][i]])),
+      Object.fromEntries(headers.map((h, i) => [h, sample[1][i]]))
+    ], '거래처_업로드_템플릿');
+    showToast('✅ 템플릿 다운로드!');
+  };
+
   const [modal, setModal] = useState(false);
   const [countryFilter, setCountryFilter] = useState('');
   const [form, setForm] = useState({
@@ -9469,7 +10329,29 @@ function BuyersPage() {
     onClick: copyAllEmails,
     color: "outline",
     sm: true
-  }, "\uD83D\uDCCB \uC774\uBA54\uC77C \uBCF5\uC0AC"), editable && /*#__PURE__*/React.createElement(Btn, {
+  }, "\uD83D\uDCCB \uC774\uBA54\uC77C \uBCF5\uC0AC"), editable && /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 4,
+      padding: '8px 12px',
+      background: '#15803d',
+      color: '#fff',
+      borderRadius: 6,
+      cursor: 'pointer',
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "📤 엑셀 업로드", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".xlsx,.xls,.csv",
+    onChange: handleBuyerImport,
+    style: { display: 'none' }
+  })), editable && /*#__PURE__*/React.createElement(Btn, {
+    onClick: downloadBuyerTemplate,
+    color: "outline",
+    sm: true
+  }, "📋 템플릿"), editable && /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       setForm({
         name: '',
@@ -9798,7 +10680,48 @@ function BuyersPage() {
     color: "outline"
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save
-  }, "\u2705 \uC800\uC7A5"))));
+  }, "\u2705 \uC800\uC7A5")))), importModal && /*#__PURE__*/React.createElement(Modal, {
+    title: '📤 거래처 일괄 등록 - 미리보기',
+    onClose: () => { setImportModal(false); setImportPreview([]); }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12, padding: 12, background: '#eff6ff', borderRadius: 8, border: '1px solid #93c5fd' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 4 }
+  }, "✅ ", importPreview.length, "건의 거래처를 인식했습니다"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, color: '#64748b' }
+  }, "추가할 방식을 선택하세요. 기존 거래처는 유지하면서 추가하거나, 모두 교체할 수 있습니다.")), /*#__PURE__*/React.createElement("div", {
+    style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
+  }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['거래처명', '국가', '구분', '담당자', '이메일', '결제'].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, importPreview.slice(0, 50).map((b, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i,
+    style: { borderBottom: '1px solid #f1f5f9' }
+  }, /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, b.name),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, b.country),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, b.type),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, b.contact || '-'),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, color: '#64748b' } }, b.email || '-'),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, b.payment))))), importPreview.length > 50 && /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: 'center', color: '#94a3b8', fontSize: 11, marginBottom: 8 }
+  }, "(50건만 미리보기 - 실제로는 ", importPreview.length, "건 모두 등록됩니다)"), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, flexWrap: 'wrap' }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => { setImportModal(false); setImportPreview([]); },
+    color: 'outline'
+  }, "취소"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => confirmBuyerImport('append'),
+    color: 'blue'
+  }, "➕ 기존에 추가 (중복 자동 스킵)"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      if (window.confirm('⚠️ 기존 거래처를 모두 삭제하고 교체합니다. 정말 진행할까요?')) {
+        confirmBuyerImport('replace');
+      }
+    },
+    color: 'red'
+  }, "🔄 전체 교체"))));
 }
 function PriceListPage() {
   const {
@@ -9811,6 +10734,140 @@ function PriceListPage() {
     canEdit,
     user
   } = useAuth();
+  // 📤 거래처단가 엑셀 일괄 등록
+  const [importPlcModal, setImportPlcModal] = useState(false);
+  const [importPlcPreview, setImportPlcPreview] = useState([]);
+  
+  const parsePriceListExcel = (rows) => {
+    if (!rows || rows.length === 0) return [];
+    const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
+    const findIdx = (...candidates) => {
+      for (const c of candidates) {
+        const idx = headers.findIndex(h => h.includes(c.toLowerCase()));
+        if (idx >= 0) return idx;
+      }
+      return -1;
+    };
+    const idxBuyer = findIdx('거래처', 'buyer', '회사');
+    const idxProduct = findIdx('상품', 'product', '품목', '제품');
+    const idxPrice = findIdx('단가', 'price', '가격', '금액');
+    
+    if (idxBuyer < 0 || idxProduct < 0 || idxPrice < 0) {
+      showToast('헤더에 \'거래처\', \'상품\', \'단가\' 컬럼이 필요합니다', '#dc2626');
+      return [];
+    }
+    
+    const result = [];
+    let nextId = (pricelist || []).reduce((max, p) => {
+      const n = parseInt((p.id || '').replace(/\D/g, '')) || 0;
+      return n > max ? n : max;
+    }, 0);
+    
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+      const buyer = String(row[idxBuyer] || '').trim();
+      const product = String(row[idxProduct] || '').trim();
+      const price = Number(String(row[idxPrice] || '').replace(/[^0-9.-]/g, '')) || 0;
+      if (!buyer || !product) continue;
+      
+      // buyerId 자동 매칭
+      const matchedBuyer = (buyers || []).find(b => (b.name || '').trim() === buyer);
+      const matchedProduct = (products || []).find(p => (p.ko || '').trim() === product || (p.en || '').trim() === product);
+      
+      nextId++;
+      result.push({
+        id: 'PL' + String(nextId).padStart(4, '0'),
+        buyer: buyer,
+        buyerId: matchedBuyer ? matchedBuyer.id : '',
+        product: product,
+        productId: matchedProduct ? matchedProduct.id : '',
+        price: price
+      });
+    }
+    return result;
+  };
+  
+  const handlePriceListImport = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const XLSX = window.XLSX;
+          if (!XLSX) {
+            showToast('엑셀 라이브러리 로딩 중... 2~3초 후 다시 시도', '#ea580c');
+            return;
+          }
+          const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          const parsed = parsePriceListExcel(rows);
+          if (parsed.length > 0) {
+            setImportPlcPreview(parsed);
+            setImportPlcModal(true);
+          } else {
+            showToast('단가 데이터를 찾을 수 없습니다', '#dc2626');
+          }
+        } catch (err) {
+          showToast('파싱 오류: ' + err.message, '#dc2626');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else if (file.name.endsWith('.csv')) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim());
+          const rows = lines.map(line => line.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
+          const parsed = parsePriceListExcel(rows);
+          if (parsed.length > 0) {
+            setImportPlcPreview(parsed);
+            setImportPlcModal(true);
+          } else {
+            showToast('단가 데이터를 찾을 수 없습니다', '#dc2626');
+          }
+        } catch (err) {
+          showToast('파싱 오류: ' + err.message, '#dc2626');
+        }
+      };
+      reader.readAsText(file, 'utf-8');
+    } else {
+      showToast('엑셀 또는 CSV만 가능', '#ea580c');
+    }
+    e.target.value = '';
+  };
+  
+  const confirmPriceListImport = (mode) => {
+    if (mode === 'replace') {
+      setPricelist(importPlcPreview);
+      if (syncDB && syncDB.pricelist) syncDB.pricelist(importPlcPreview);
+      showToast('✅ ' + importPlcPreview.length + '건으로 전체 교체!');
+    } else {
+      // 중복 체크: 같은 buyer + product
+      const existingKeys = new Set((pricelist || []).map(p => (p.buyer || '') + '|' + (p.product || '')));
+      const newItems = importPlcPreview.filter(p => !existingKeys.has(p.buyer + '|' + p.product));
+      const merged = [...(pricelist || []), ...newItems];
+      setPricelist(merged);
+      if (syncDB && syncDB.pricelist) syncDB.pricelist(merged);
+      showToast('✅ ' + newItems.length + '건 추가 (중복 ' + (importPlcPreview.length - newItems.length) + '건 스킵)');
+    }
+    setImportPlcModal(false);
+    setImportPlcPreview([]);
+  };
+  
+  const downloadPriceListTemplate = () => {
+    const sample = [
+      { '거래처': '㈜샘플상사', '상품': '폭풍떡볶이 컵', '단가': 1892 },
+      { '거래처': '㈜샘플상사', '상품': '약과(50개)', '단가': 30800 },
+      { '거래처': 'ABC Trading', '상품': 'Spicy Cup Tteokbokki', '단가': 2.5 }
+    ];
+    downloadCSV(sample, '거래처단가_업로드_템플릿');
+    showToast('✅ 템플릿 다운로드!');
+  };
+
   const editable = canEdit('pricelist');
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({
@@ -9870,7 +10927,31 @@ function PriceListPage() {
       fontSize: 11,
       color: '#94a3b8'
     }
-  }, pricelist.length, "\uAC1C \xB7 \uACAC\uC801\uC11C \uC791\uC131 \uC2DC \uC790\uB3D9 \uC801\uC6A9")), /*#__PURE__*/React.createElement(Btn, {
+  }, pricelist.length, "\uAC1C \xB7 \uACAC\uC801\uC11C \uC791\uC131 \uC2DC \uC790\uB3D9 \uC801\uC6A9")), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 6, flexWrap: 'wrap' }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 4,
+      padding: '8px 12px',
+      background: '#15803d',
+      color: '#fff',
+      borderRadius: 6,
+      cursor: 'pointer',
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "📤 엑셀 업로드", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".xlsx,.xls,.csv",
+    onChange: handlePriceListImport,
+    style: { display: 'none' }
+  })), /*#__PURE__*/React.createElement(Btn, {
+    onClick: downloadPriceListTemplate,
+    color: 'outline',
+    sm: true
+  }, "📋 템플릿"), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       setForm({
         buyerId: '',
@@ -9885,7 +10966,7 @@ function PriceListPage() {
       });
       setModal(true);
     }
-  }, "\u271A \uB2E8\uAC00 \uCD94\uAC00")), /*#__PURE__*/React.createElement("div", {
+  }, "\u271A \uB2E8\uAC00 \uCD94\uAC00"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 6,
@@ -10070,7 +11151,46 @@ function PriceListPage() {
     color: "outline"
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save
-  }, "\u2705 \uC800\uC7A5"))));
+  }, "\u2705 \uC800\uC7A5")))), importPlcModal && /*#__PURE__*/React.createElement(Modal, {
+    title: '📤 거래처단가 일괄 등록 - 미리보기',
+    onClose: () => { setImportPlcModal(false); setImportPlcPreview([]); }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12, padding: 12, background: '#eff6ff', borderRadius: 8, border: '1px solid #93c5fd' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 4 }
+  }, "✅ ", importPlcPreview.length, "건의 단가 데이터 인식"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, color: '#64748b' }
+  }, "거래처 / 상품명이 기존 데이터와 매칭되면 자동 연결됩니다.")), /*#__PURE__*/React.createElement("div", {
+    style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
+  }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['거래처', '상품', '단가', '매칭'].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, importPlcPreview.slice(0, 50).map((p, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i,
+    style: { borderBottom: '1px solid #f1f5f9' }
+  }, /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, p.buyer),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, p.product),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace' } }, won(p.price)),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontSize: 10 } }, p.buyerId && p.productId ? '✅ 자동' : (p.buyerId ? '🟡 거래처만' : '⚠️ 신규')))))), importPlcPreview.length > 50 && /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: 'center', color: '#94a3b8', fontSize: 11, marginBottom: 8 }
+  }, "(50건만 미리보기 - 실제로는 ", importPlcPreview.length, "건 모두 등록)"), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, flexWrap: 'wrap' }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => { setImportPlcModal(false); setImportPlcPreview([]); },
+    color: 'outline'
+  }, "취소"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => confirmPriceListImport('append'),
+    color: 'blue'
+  }, "➕ 기존에 추가"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      if (window.confirm('⚠️ 기존 단가를 모두 삭제하고 교체합니다. 정말 진행할까요?')) {
+        confirmPriceListImport('replace');
+      }
+    },
+    color: 'red'
+  }, "🔄 전체 교체"))));
 }
 function ReportPage() {
   const {
@@ -13445,6 +14565,212 @@ function MyPage() {
     style: { flex: 1, minWidth: 140, justifyContent: 'center' }
   }, "\uD83D\uDCE4 \uBC31\uC5C5\uC5D0\uC11C \uBCF5\uC6D0")))))));
 }
+function HelpPage() {
+  const ctx = useAuth();
+  if (!ctx || !ctx.user) {
+    return /*#__PURE__*/React.createElement("div", { style: { padding: 40, textAlign: 'center' } }, "로그인이 필요합니다");
+  }
+  const { user } = ctx;
+  const isApprover = ['ceo', 'admin', 'vice'].includes(user.role);
+  const sections = [
+    {
+      icon: '🏠',
+      title: '대시보드',
+      desc: '회사 전체 현황을 한눈에 보는 페이지',
+      items: [
+        '이번 달 매출/매입 자동 집계',
+        '미수금 D-Day 알림 (연체 7일/14일/30일)',
+        '재고 부족 경고',
+        '최근 거래 내역',
+        '백업 알림 (7일 이상 미백업 시)'
+      ]
+    },
+    {
+      icon: '💰',
+      title: '매출관리',
+      desc: '매출 등록 시 자동으로 모든 게 처리됩니다',
+      items: [
+        '매출 등록 → 미수금 자동 생성 (예정일: +30일)',
+        '재고 자동 차감',
+        '손익계산서 매출액 자동 반영',
+        '대시보드 통계 자동 업데이트',
+        '대표/관리자: 엑셀 일괄 등록 가능 📤',
+        '직원: 단건 등록 → 결재 요청'
+      ]
+    },
+    {
+      icon: '🛒',
+      title: '매입관리',
+      desc: '매입 등록 시 자동 처리',
+      items: [
+        '매입 등록 → 미지급 자동 생성',
+        '재고 자동 입고',
+        '손익계산서 매출원가 자동 반영',
+        '대표/관리자: 엑셀 일괄 등록 가능 📤'
+      ]
+    },
+    {
+      icon: '💵',
+      title: '수금관리',
+      desc: '실제 입금 받은 내역 관리',
+      items: [
+        '미수금 현황 + 연체 D-Day 색상 표시',
+        '수금 등록 → 매출의 \'수금완료\' 자동 체크',
+        '자금일보 입금에 자동 반영',
+        '연체 알림 (대시보드에서 클릭하면 자동 필터)'
+      ]
+    },
+    {
+      icon: '💸',
+      title: '지급관리',
+      desc: '실제 지급한 내역 관리',
+      items: [
+        '미지급 현황 표시',
+        '지급 등록 → 매입의 \'지급완료\' 자동 체크',
+        '자금일보 출금에 자동 반영'
+      ]
+    },
+    {
+      icon: '📊',
+      title: '손익계산서',
+      desc: '월별 회사 수익 (발생주의)',
+      items: [
+        '매출 등록 시점 기준 (발생주의)',
+        '6개월 추이 그래프',
+        '매출액 - 매출원가 - 판관비 = 영업이익',
+        '엑셀 다운로드 가능'
+      ]
+    },
+    {
+      icon: '💰',
+      title: '자금일보',
+      desc: '실제 현금 흐름 (현금주의)',
+      items: [
+        '실제 수금/지급 시점 기준',
+        '전일잔액 → 당일 입출금 → 당일잔액',
+        '7일 추이 그래프',
+        '날짜 선택 가능'
+      ]
+    },
+    {
+      icon: '📋',
+      title: '결재함',
+      desc: isApprover ? '직원 요청 승인/반려' : '내가 요청한 결재 현황',
+      items: isApprover ? [
+        '직원이 등록 요청한 건 모두 표시',
+        '승인 → 자동으로 데이터 반영',
+        '반려 → 사유 입력 후 거부',
+        '대기 중인 건은 손익/대시보드 미반영'
+      ] : [
+        '내가 요청한 건의 상태 (대기/승인/반려)',
+        '승인 후 데이터 반영됨',
+        '반려된 건은 사유 확인 가능'
+      ]
+    },
+    {
+      icon: '👥',
+      title: '거래처 / 거래처단가',
+      desc: '거래처와 단가 관리',
+      items: [
+        '거래처 추가/수정/삭제',
+        '거래처별 상품 단가 등록',
+        '엑셀 일괄 등록 가능 📤',
+        '템플릿 다운로드 → 입력 → 업로드'
+      ]
+    },
+    {
+      icon: '📦',
+      title: '상품/단가 / 재고관리',
+      desc: '상품과 재고 관리',
+      items: [
+        '상품 마스터 등록',
+        '실시간 재고 표시',
+        '안전재고 설정 (부족 시 대시보드 알림)',
+        '엑셀 일괄 등록 가능'
+      ]
+    }
+  ];
+  const cautions = [
+    {
+      icon: '⚠️',
+      title: '데이터 무결성',
+      items: [
+        '매출 취소 → 미수금/재고 자동 원복',
+        '매출 삭제 → 모든 연관 데이터 자동 정리',
+        '매출 수정 → 재고/미수금 자동 재계산',
+        '취소된 데이터는 통계에서 자동 제외'
+      ]
+    },
+    {
+      icon: '💾',
+      title: '백업 (매주 권장)',
+      items: [
+        '대시보드 → \'📥 백업 다운로드\' 클릭',
+        'JSON 파일 자동 저장됨',
+        '7일 이상 미백업 시 알림 표시',
+        '복원: \'📤 백업 복원\' → JSON 파일 선택'
+      ]
+    },
+    {
+      icon: '🔐',
+      title: '권한 시스템',
+      items: [
+        '대표(👑): 모든 권한',
+        '관리자/전무(🛠️): 모든 권한 자동 (직원관리 가능)',
+        '직원(👤): 권한 부여받은 만큼만',
+        '직원이 매출/매입/수금/지급 등록 → 결재 필요',
+        '엑셀 일괄 등록은 대표/관리자만 가능'
+      ]
+    }
+  ];
+  return /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 22, fontWeight: 800 }
+    }, "📖 사용 가이드"),
+       /*#__PURE__*/React.createElement(Tag, { c: 'blue' }, "v3.0")),
+    /*#__PURE__*/React.createElement("div", {
+      style: { padding: 16, background: 'linear-gradient(135deg,#dbeafe,#dcfce7)', borderRadius: 12, marginBottom: 16, border: '1px solid #93c5fd' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 14, fontWeight: 700, color: '#1e40af', marginBottom: 4 }
+    }, "👋 ", user.name, "님, 신화ERP에 오신 것을 환영합니다"),
+       /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 12, color: '#475569' }
+    }, "이 페이지는 ERP 사용법을 안내합니다. 각 페이지의 자동 처리와 권한 설정을 확인하세요.")),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }
+    }, sections.map((s, i) => /*#__PURE__*/React.createElement(Card, { key: i },
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }
+      }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 24 } }, s.icon),
+         /*#__PURE__*/React.createElement("div", null,
+           /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 700 } }, s.title),
+           /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: '#64748b' } }, s.desc))),
+      /*#__PURE__*/React.createElement("ul", {
+        style: { fontSize: 12, color: '#475569', paddingLeft: 20, margin: 0, lineHeight: 1.7 }
+      }, s.items.map((item, j) => /*#__PURE__*/React.createElement("li", { key: j }, item)))))),
+    /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 18, fontWeight: 700, marginBottom: 12, paddingTop: 8 }
+    }, "🛡️ 중요 사항"),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }
+    }, cautions.map((c, i) => /*#__PURE__*/React.createElement(Card, {
+      key: i,
+      style: { background: '#fef3c7', borderColor: '#fcd34d' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 15, fontWeight: 700, marginBottom: 8 }
+    }, c.icon, " ", c.title),
+       /*#__PURE__*/React.createElement("ul", {
+      style: { fontSize: 12, color: '#78350f', paddingLeft: 20, margin: 0, lineHeight: 1.7 }
+    }, c.items.map((item, j) => /*#__PURE__*/React.createElement("li", { key: j }, item)))))),
+    /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 24, padding: 16, background: '#f8fafc', borderRadius: 8, fontSize: 12, color: '#64748b', textAlign: 'center' }
+    }, "💡 사용 중 문제가 있거나 추가 기능이 필요하시면 대표에게 문의하세요")
+  );
+}
+
+
 function UsersPage() {
   const {
     users,
