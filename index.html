@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1557 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1601 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -7549,7 +7549,7 @@ function ReceiptPage() {
   }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const totalBilled = filteredRec.reduce((a, r) => a + (r.billed || 0), 0);
   const totalReceived = filteredRec.reduce((a, r) => a + (r.received || 0), 0);
-  return /*#__PURE__*/React.createElement("div", { style: { minHeight: 200 } }, /*#__PURE__*/React.createElement("div", { style: { padding: 12, background: '#dcfce7', marginBottom: 10, fontSize: 13, color: '#166534', fontWeight: 700, border: '2px solid #86efac', borderRadius: 8 } }, "✅ 수금관리 페이지 정상 로드됨 - 데이터 ", filteredRec.length, "건"), receiptFilter === 'overdue' && /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement("div", { style: { minHeight: 400, background: '#fff' } }, /*#__PURE__*/React.createElement("div", { style: { padding: 16, background: '#fee2e2', marginBottom: 10, fontSize: 14, color: '#dc2626', fontWeight: 800, border: '3px solid #dc2626', borderRadius: 8, textAlign: 'center' } }, "🚨 [진단] ReceiptPage 정상 로드 / 수금 데이터: ", filteredRec.length, "건 / editable: ", editable ? 'YES' : 'NO'), receiptFilter === 'overdue' && /*#__PURE__*/React.createElement("div", {
     style: {
       background: 'linear-gradient(135deg,#fef2f2,#fee2e2)',
       border: '2px solid #fca5a5',
