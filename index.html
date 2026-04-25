@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1601 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1609 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -7257,17 +7257,19 @@ function ReceiptPage() {
   const ctx = useAuth();
   if (!ctx || !ctx.user) {
     return /*#__PURE__*/React.createElement("div", {
-      style: { padding: 40, textAlign: 'center', color: '#dc2626' }
+      style: { padding: 40, textAlign: 'center' }
     }, "🔒 로그인이 필요합니다");
   }
   const {
     receipts = [],
-    setReceipts,
+    setReceipts = () => {},
     sales = [],
-    setSales,
+    setSales = () => {},
     showToast = () => {},
     canEdit = () => false,
-    canApprove = () => false,
+    canCreate = () => false,
+    canUpdate = () => false,
+    canDelete = () => false,
     syncDB = {},
     user,
     requestApproval = () => {},
@@ -7279,730 +7281,312 @@ function ReceiptPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [modal, setModal] = useState(false);
-  const [bankModal, setBankModal] = useState(null);
-  const [bankRows, setBankRows] = useState([]);
-  const [bankMatches, setBankMatches] = useState([]);
-  const [showCanceledR, setShowCanceledR] = useState(false);
+  const [showCanceled, setShowCanceled] = useState(false);
   const [form, setForm] = useState({
     date: todayStr(),
     partner: '',
     item: '',
     billed: '',
     received: '',
+    method: '',
+    expectedDate: '',
     note: ''
   });
-  const getDday = expectedDate => {
+  // D-Day 계산
+  const getDday = (expectedDate) => {
     if (!expectedDate) return null;
-    const diff = Math.floor((new Date(expectedDate) - new Date()) / (1000 * 60 * 60 * 24));
-    return diff;
+    try {
+      const exp = new Date(expectedDate);
+      if (isNaN(exp.getTime())) return null;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      exp.setHours(0, 0, 0, 0);
+      return Math.floor((exp - today) / (1000 * 60 * 60 * 24));
+    } catch (e) { return null; }
   };
-  const getOverdueColor = dday => {
-    if (dday === null) return null;
-    if (dday < -14) return {
-      bg: '#fef2f2',
-      border: '#fca5a5',
-      text: '#dc2626'
-    };
-    if (dday < -7) return {
-      bg: '#fff7ed',
-      border: '#fed7aa',
-      text: '#ea580c'
-    };
-    if (dday < 0) return {
-      bg: '#fefce8',
-      border: '#fef08a',
-      text: '#ca8a04'
-    };
-    if (dday === 0) return {
-      bg: '#eff6ff',
-      border: '#bfdbfe',
-      text: '#1d4ed8'
-    };
-    return null;
-  };
-  const editable = canEdit('receipt');
-  // === 통장 매칭 함수들 ===
-  const handleBankUpload = (file) => {
-    if (!window.XLSX) {
-      showToast('엑셀 라이브러리 로딩 중... 2~3초 후 다시 시도', '#ea580c');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      try {
-        const wb = window.XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        // 첫 입금 데이터 찾기 - 한국 은행 엑셀 양식 자동 인식
-        // 헤더 찾기 (날짜/입금/출금 컬럼이 있는 행)
-        let headerIdx = -1;
-        let dateCol = -1, depositCol = -1, withdrawCol = -1, descCol = -1, balanceCol = -1;
-        for (let i = 0; i < Math.min(rows.length, 20); i++) {
-          const row = rows[i];
-          const rowStr = row.map(c => String(c)).join('|');
-          // 한국 은행들의 헤더 패턴
-          if (/날짜|거래일|일자/.test(rowStr) && /입금|입출/.test(rowStr)) {
-            headerIdx = i;
-            for (let j = 0; j < row.length; j++) {
-              const h = String(row[j] || '');
-              if (/날짜|거래일|일자/.test(h) && dateCol < 0) dateCol = j;
-              else if (/입금/.test(h) && !/출/.test(h) && depositCol < 0) depositCol = j;
-              else if (/출금/.test(h) && !/입/.test(h) && withdrawCol < 0) withdrawCol = j;
-              else if (/내용|적요|거래처|상대|메모|비고/.test(h) && descCol < 0) descCol = j;
-              else if (/잔액|잔고/.test(h) && balanceCol < 0) balanceCol = j;
-            }
-            break;
-          }
+  // 필터링된 수금 리스트
+  const filteredRec = useMemo(() => {
+    try {
+      let list = (Array.isArray(receipts) ? receipts : []).filter(r => {
+        if (!r) return false;
+        if (!showCanceled && r.status === '취소') return false;
+        if (partnerFilter && !(r.partner || '').includes(partnerFilter)) return false;
+        if (dateFrom && (r.date || '') < dateFrom) return false;
+        if (dateTo && (r.date || '') > dateTo) return false;
+        if (receiptFilter === 'overdue') {
+          const remain = (Number(r.billed) || 0) - (Number(r.received) || 0);
+          if (remain <= 0) return false;
+          if (!r.expectedDate) return false;
+          const dday = getDday(r.expectedDate);
+          if (dday === null || dday >= 0) return false;
         }
-        if (headerIdx < 0 || dateCol < 0 || depositCol < 0) {
-          showToast('통장 양식을 인식할 수 없어요. 컬럼: 날짜, 입금, 적요 필수', '#dc2626');
-          return;
-        }
-        // 입금만 추출
-        const deposits = [];
-        for (let i = headerIdx + 1; i < rows.length; i++) {
-          const row = rows[i];
-          if (!row || !row[dateCol]) continue;
-          const depAmt = +String(row[depositCol] || '').replace(/[^0-9.-]/g, '') || 0;
-          if (depAmt <= 0) continue;
-          let dateStr = String(row[dateCol] || '');
-          // 날짜 정규화 (YYYY-MM-DD)
-          dateStr = dateStr.replace(/[./]/g, '-').slice(0, 10);
-          if (!/^\d{4}-\d{1,2}-\d{1,2}/.test(dateStr)) continue;
-          const parts = dateStr.split('-');
-          dateStr = parts[0] + '-' + String(parts[1]).padStart(2,'0') + '-' + String(parts[2]).padStart(2,'0');
-          deposits.push({
-            id: 'bank_' + i,
-            date: dateStr,
-            amount: depAmt,
-            desc: String(row[descCol] || '').trim(),
-            balance: row[balanceCol] || 0,
-            matched: null
-          });
-        }
-        if (deposits.length === 0) {
-          showToast('입금 내역을 찾을 수 없습니다', '#dc2626');
-          return;
-        }
-        // 자동 매칭
-        const unpaidReceipts = receipts.filter(r => 
-          r.status !== '취소' && (r.billed || 0) > (r.received || 0)
-        );
-        const matched = deposits.map(dep => {
-          // 1. 금액 일치하는 미수 수금 찾기
-          const remainCandidates = unpaidReceipts.filter(r => {
-            const remain = (r.billed || 0) - (r.received || 0);
-            return remain === dep.amount;
-          });
-          // 2. 거래처명 매칭 (입금 적요에 거래처명 포함되는지)
-          const desc = dep.desc.toLowerCase().replace(/\s/g, '');
-          let bestMatch = null;
-          let bestScore = 0;
-          for (const r of remainCandidates) {
-            const partnerName = (r.partner || '').toLowerCase().replace(/\s/g, '');
-            if (!partnerName) continue;
-            // 거래처명에서 핵심 단어 추출 (㈜, (주), 회사, 상사, 코퍼레이션 등 제거)
-            const cleanPartner = partnerName.replace(/[(주)㈜()주식회사상사코퍼레이션corp\.,]/g, '');
-            if (cleanPartner && desc.includes(cleanPartner.slice(0, Math.min(3, cleanPartner.length)))) {
-              bestMatch = r;
-              bestScore = 100;
-              break;
-            }
-            // 첫 글자만 비교 (홍길동 → 홍)
-            if (cleanPartner && desc.includes(cleanPartner.charAt(0))) {
-              if (bestScore < 50) {
-                bestMatch = r;
-                bestScore = 50;
-              }
-            }
-          }
-          // 거래처명 매칭 안되면 그냥 첫 후보
-          if (!bestMatch && remainCandidates.length === 1) {
-            bestMatch = remainCandidates[0];
-            bestScore = 70; // 금액만 일치
-          } else if (!bestMatch && remainCandidates.length > 1) {
-            // 다중 후보 - 가장 가까운 날짜
-            bestMatch = remainCandidates.sort((a, b) => {
-              const diffA = Math.abs(new Date(dep.date) - new Date(a.expectedDate || a.date));
-              const diffB = Math.abs(new Date(dep.date) - new Date(b.expectedDate || b.date));
-              return diffA - diffB;
-            })[0];
-            bestScore = 60;
-          }
-          return {
-            ...dep,
-            match: bestMatch,
-            score: bestScore,
-            confirmed: bestScore >= 70
-          };
-        });
-        setBankRows(deposits);
-        setBankMatches(matched);
-      } catch (err) {
-        console.error('통장 파싱 오류:', err);
-        showToast('파일 읽기 실패: ' + err.message, '#dc2626');
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-  const applyBankMatches = () => {
-    const confirmedMatches = bankMatches.filter(m => m.confirmed && m.match);
-    if (confirmedMatches.length === 0) {
-      showToast('처리할 매칭이 없습니다', '#dc2626');
-      return;
-    }
-    if (!window.confirm(`${confirmedMatches.length}건의 수금을 자동 처리합니다. 진행하시겠습니까?`)) return;
-    let updatedReceipts = [...receipts];
-    confirmedMatches.forEach(m => {
-      updatedReceipts = updatedReceipts.map(r => {
-        if (r.id === m.match.id) {
-          const newReceived = (r.received || 0) + m.amount;
-          const newRemain = Math.max(0, (r.billed || 0) - newReceived);
-          return {
-            ...r,
-            received: newReceived,
-            receivedDate: m.date,
-            note: ((r.note || '') + ` [통장매칭 ${m.date} ${m.amount.toLocaleString()}]`).trim(),
-            paymentMethod: '계좌이체'
-          };
-        }
-        return r;
+        return true;
       });
-    });
-    setReceipts(updatedReceipts);
-    syncDB && updatedReceipts.forEach(r => {
-      const orig = receipts.find(x => x.id === r.id);
-      if (orig && orig.received !== r.received) {
-        try { syncDB.receipt(r); } catch(e) { console.error(e); }
-      }
-    });
-    setBankModal(null);
-    setBankRows([]);
-    setBankMatches([]);
-    showToast(`✅ ${confirmedMatches.length}건 자동 처리 완료!`);
-  };
+      return list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    } catch (e) {
+      console.error('수금 필터 오류:', e);
+      return [];
+    }
+  }, [receipts, partnerFilter, dateFrom, dateTo, showCanceled, receiptFilter]);
+  // 통계
+  const totalBilled = filteredRec.reduce((a, r) => a + (Number(r.billed) || 0), 0);
+  const totalReceived = filteredRec.reduce((a, r) => a + (Number(r.received) || 0), 0);
+  const totalUnpaid = totalBilled - totalReceived;
+  const editable = canEdit('receipt');
+  // 수금 등록/수정 저장
   const save = () => {
-    if (!form.partner || !form.billed) {
-      showToast('거래처와 청구금액을 입력하세요', '#dc2626');
+    if (!form.partner || !form.received) {
+      showToast('거래처와 수금액을 입력하세요', '#dc2626');
       return;
     }
-    if ((+form.billed || 0) <= 0) {
-      showToast('금액은 0보다 커야 합니다', '#dc2626');
+    const billed = Number(form.billed) || 0;
+    const received = Number(form.received) || 0;
+    if (received <= 0) {
+      showToast('수금액은 0보다 커야 합니다', '#dc2626');
       return;
     }
-    if (typeof modal === 'number' || typeof modal === 'string' && modal !== false && modal !== true) {
+    const status = received >= billed && billed > 0 ? '완료' : '부분수금';
+    if (typeof modal === 'number' || typeof modal === 'string') {
+      // 수정
       const updated = {
+        ...((receipts || []).find(x => x.id === modal) || {}),
         ...form,
-        id: modal,
-        billed: +form.billed || 0,
-        received: +form.received || 0
+        billed,
+        received,
+        status
       };
-      setReceipts(prev => prev.map(x => x.id === modal ? updated : x));
-      syncDB.receipt(updated);
-      setModal(false);
+      setReceipts(prev => (prev || []).map(x => x.id === modal ? updated : x));
+      if (syncDB.receipt) syncDB.receipt(updated);
       showToast('✅ 수금 수정!');
-      return;
-    }
-    const entry = {
-      id: Date.now(),
-      ...form,
-      billed: +form.billed || 0,
-      received: +form.received || 0
-    };
-    if (user.role === 'staff') {
-      requestApproval('receipt_add', '수금 등록: ' + form.partner, entry, user.name);
-      setModal(false);
-      return;
-    }
-    setReceipts(prev => [...prev, entry]);
-    syncDB.receipt(entry);
-    // 수금 완료 시 매출 collected 자동 업데이트
-    const totalBil = +form.billed || 0;
-    const totalRec = +form.received || 0;
-    if (totalRec >= totalBil && totalBil > 0 && setSales) {
-      setSales(prev => prev.map(s => s.partner === form.partner && !s.collected ? {
-        ...s,
-        collected: true
-      } : s));
+    } else {
+      // 신규
+      const entry = {
+        id: Date.now(),
+        ...form,
+        billed,
+        received,
+        status,
+        docNo: 'RCP-' + Date.now()
+      };
+      if (user.role === 'staff' && requestApproval) {
+        requestApproval('receipt_add', '수금 등록: ' + form.partner, entry, user.name);
+        setModal(false);
+        return;
+      }
+      setReceipts(prev => [...(prev || []), entry]);
+      if (syncDB.receipt) syncDB.receipt(entry);
+      // 매출 collected 업데이트
+      if (received >= billed && billed > 0 && setSales) {
+        setSales(prev => (prev || []).map(s => s.partner === form.partner && !s.collected ? { ...s, collected: true } : s));
+      }
+      showToast('✅ 수금 등록!');
     }
     setModal(false);
-    showToast('✅ 수금 등록!');
   };
-  const filteredRec = receipts.filter(r => {
-    if (!showCanceledR && r.status === '취소') return false;
-    if (partnerFilter && !(r.partner || '').includes(partnerFilter)) return false;
-    if (dateFrom && (r.date || '') < dateFrom) return false;
-    if (dateTo && (r.date || '') > dateTo) return false;
-    // 연체 필터 (대시보드 → 수금관리 이동 시 자동 적용)
-    if (receiptFilter === 'overdue') {
-      const remain = (r.billed || 0) - (r.received || 0);
-      if (remain <= 0) return false;
-      if (!r.expectedDate) return false;
-      const exp = new Date(r.expectedDate);
-      if (isNaN(exp.getTime())) return false;
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      exp.setHours(0,0,0,0);
-      if (exp >= today) return false;
-    }
-    return true;
-  }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  const totalBilled = filteredRec.reduce((a, r) => a + (r.billed || 0), 0);
-  const totalReceived = filteredRec.reduce((a, r) => a + (r.received || 0), 0);
-  return /*#__PURE__*/React.createElement("div", { style: { minHeight: 400, background: '#fff' } }, /*#__PURE__*/React.createElement("div", { style: { padding: 16, background: '#fee2e2', marginBottom: 10, fontSize: 14, color: '#dc2626', fontWeight: 800, border: '3px solid #dc2626', borderRadius: 8, textAlign: 'center' } }, "🚨 [진단] ReceiptPage 정상 로드 / 수금 데이터: ", filteredRec.length, "건 / editable: ", editable ? 'YES' : 'NO'), receiptFilter === 'overdue' && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: 'linear-gradient(135deg,#fef2f2,#fee2e2)',
-      border: '2px solid #fca5a5',
-      borderRadius: 10,
-      padding: '12px 16px',
-      marginBottom: 12,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      flexWrap: 'wrap'
-    }
-  }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\u26A0\uFE0F"), /*#__PURE__*/React.createElement("span", {
-    style: { flex: 1, fontSize: 13, fontWeight: 700, color: '#7f1d1d', minWidth: 200 }
-  }, "\uC5F0\uCCB4 \uD544\uD130 \uD65C\uC131 - \uC785\uAE08 \uC608\uC815\uC77C\uC774 \uC9C0\uB09C \uBBF8\uC218\uAE08\uB9CC \uD45C\uC2DC \uC911 (", filteredRec.length, "\uAC74)"), /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => setReceiptFilter(null),
-    color: 'outline',
-    sm: true
-  }, "\u2715 \uD544\uD130 \uD574\uC81C")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 16,
-      fontWeight: 700
-    }
-  }, "\uD83D\uDCB5 \uC218\uAE08\uAD00\uB9AC"), /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 11,
-      color: '#94a3b8',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 4,
-      marginTop: 2
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "checkbox",
-    checked: showCanceledR,
-    onChange: e => setShowCanceledR(e.target.checked)
-  }), "\uCDE8\uC18C\uAC74 \uD3EC\uD568")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 8
-    }
-  }, editable && /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => {
-      setForm({
-        date: todayStr(),
-        partner: '',
-        item: '',
-        billed: '',
-        received: '',
-        note: ''
-      });
-      setModal(true);
-    }
-  }, "\u271A \uC218\uAE08 \uB4F1\uB85D"), /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => {
-      const exportRows = filteredRec.map(r => ({
+  // 삭제 (취소)
+  const cancel = (r) => {
+    if (!window.confirm('이 수금을 취소하시겠습니까?')) return;
+    const updated = { ...r, status: '취소' };
+    setReceipts(prev => (prev || []).map(x => x.id === r.id ? updated : x));
+    if (syncDB.receipt) syncDB.receipt(updated);
+    showToast('✅ 취소 처리됨');
+  };
+  // 엑셀 다운로드
+  const exportExcel = () => {
+    try {
+      const rows = filteredRec.map(r => ({
         '날짜': r.date || '',
         '거래처': r.partner || '',
-        '항목': r.item || '',
-        '청구금액': r.billed || 0,
-        '수금금액': r.received || 0,
-        '미수금': Math.max(0, (r.billed || 0) - (r.received || 0)),
-        '예정일': r.expectedDate || '',
-        '상태': r.status || '정상',
+        '품목': r.item || '',
+        '청구액': Number(r.billed) || 0,
+        '수금액': Number(r.received) || 0,
+        '미수금': (Number(r.billed) || 0) - (Number(r.received) || 0),
+        '입금예정일': r.expectedDate || '',
+        '결제수단': r.method || '',
+        '상태': r.status || '미수',
         '비고': r.note || ''
       }));
-      downloadCSV(exportRows, '수금내역');
+      downloadCSV(rows, '수금내역_' + todayStr());
       showToast('✅ 엑셀 다운로드!');
-    },
-    color: "outline"
-  }, "\uD83D\uDCC4 \uC5D1\uC140"), editable && /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => setBankModal('upload'),
-    color: "blue"
-  }, "\uD83D\uDCD1 \uD1B5\uC7A5\uB9E4\uCE6D"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(3,1fr)',
-      gap: 10,
-      marginBottom: 14
+    } catch (e) {
+      showToast('❌ 다운로드 실패', '#dc2626');
     }
-  }, [{
-    l: '총 청구',
-    v: won(totalBilled),
-    c: '#0f172a'
-  }, {
-    l: '수금 완료',
-    v: won(totalReceived),
-    c: '#15803d'
-  }, {
-    l: '미수금',
-    v: won(totalBilled - totalReceived),
-    c: '#dc2626'
-  }].map((s, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    style: {
-      background: '#fff',
-      border: '1px solid #e2e8f0',
-      borderRadius: 10,
-      padding: '12px 14px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: '#94a3b8',
-      marginBottom: 3
-    }
-  }, s.l), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 17,
-      fontWeight: 700,
-      color: s.c,
-      fontFamily: 'monospace'
-    }
-  }, s.v)))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 6,
-      marginBottom: 8,
-      flexWrap: 'wrap'
-    }
-  }, [{
-    l: '오늘',
-    fn: () => {
-      const t = todayStr();
-      setDateFrom(t);
-      setDateTo(t);
-    }
-  }, {
-    l: '이번달',
-    fn: () => {
-      const n = new Date();
-      setDateFrom(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-01`);
-      setDateTo(todayStr());
-    }
-  }, {
-    l: '지난달',
-    fn: () => {
-      const n = new Date();
-      const lm = new Date(n.getFullYear(), n.getMonth() - 1, 1);
-      const le = new Date(n.getFullYear(), n.getMonth(), 0);
-      setDateFrom(lm.toISOString().slice(0, 10));
-      setDateTo(le.toISOString().slice(0, 10));
-    }
-  }, {
-    l: '전체',
-    fn: () => {
-      setDateFrom('');
-      setDateTo('');
-    }
-  }].map(b => /*#__PURE__*/React.createElement("button", {
-    key: b.l,
-    onClick: b.fn,
-    style: {
-      padding: '4px 10px',
-      borderRadius: 16,
-      fontSize: 11,
-      fontWeight: 600,
-      cursor: 'pointer',
-      border: '1.5px solid #e2e8f0',
-      background: '#f8fafc',
-      color: '#475569'
-    }
-  }, b.l))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 8,
-      flexWrap: 'wrap',
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1,
-      minWidth: 150
-    }
-  }, /*#__PURE__*/React.createElement(BuyerSelect, {
-    value: partnerFilter,
-    onChange: v => setPartnerFilter(v),
-    placeholder: "\uD83C\uDFE2 \uAC70\uB798\uCC98 \uD544\uD130"
-  })), /*#__PURE__*/React.createElement("input", {
-    type: "date",
-    value: dateFrom,
-    onChange: e => setDateFrom(e.target.value),
-    style: {
-      ...inp2style,
-      width: 130
-    }
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: '#94a3b8'
-    }
-  }, "~"), /*#__PURE__*/React.createElement("input", {
-    type: "date",
-    value: dateTo,
-    onChange: e => setDateTo(e.target.value),
-    style: {
-      ...inp2style,
-      width: 130
-    }
-  }), (partnerFilter || dateFrom || dateTo) && /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => {
-      setPartnerFilter('');
-      setDateFrom('');
-      setDateTo('');
-    },
-    color: "outline",
-    sm: true
-  }, "\u2715 \uCD08\uAE30\uD654"))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
-    heads: ['날짜', '거래처', '품목', '청구금액', '수금액', '잔액', '상태', editable ? '' : ''].filter(Boolean),
-    rows: [...filteredRec].reverse().map((r, i) => {
-      const rem = (r.billed || 0) - (r.received || 0);
-      const done = rem <= 0;
-      return /*#__PURE__*/React.createElement("tr", {
-        key: r.id,
-        style: {
-          background: r.status === '취소' ? '#f9fafb' : done ? '#f0fdf4' : rem > 0 ? '#fef2f2' : i % 2 ? '#fafbff' : '#fff',
-          borderLeft: r.status === '취소' ? '3px solid #e2e8f0' : done ? '3px solid #16a34a' : rem > 0 ? '3px solid #dc2626' : 'none',
-          opacity: r.status === '취소' ? .5 : 1
-        }
-      }, /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, r.date), /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, /*#__PURE__*/React.createElement("strong", null, r.partner)), /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, r.item || '—'), /*#__PURE__*/React.createElement("td", {
-        style: {
-          ...S.td,
-          fontFamily: 'monospace'
-        }
-      }, won(r.billed)), /*#__PURE__*/React.createElement("td", {
-        style: {
-          ...S.td,
-          fontFamily: 'monospace',
-          color: '#15803d'
-        }
-      }, won(r.received)), /*#__PURE__*/React.createElement("td", {
-        style: {
-          ...S.td,
-          fontFamily: 'monospace',
-          fontWeight: 700,
-          color: rem > 0 ? '#dc2626' : '#15803d'
-        }
-      }, won(rem)), /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, /*#__PURE__*/React.createElement(Tag, {
-        c: done ? 'green' : 'orange'
-      }, done ? '완료' : '미수')), editable && /*#__PURE__*/React.createElement("td", {
-        style: S.td
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: 'flex',
-          gap: 4
-        }
-      }, /*#__PURE__*/React.createElement(Btn, {
-        sm: true,
-        color: "red",
-        onClick: () => {
-          if (!window.confirm('수금 내역을 취소 처리하시겠습니까?')) return;
-          const upd = {
-            ...r,
-            status: '취소',
-            canceledAt: todayStr()
-          };
-          setReceipts(prev => prev.map(x => x.id === r.id ? upd : x));
-          syncDB.receipt(upd);
-          setShowCanceledR(false);
-          showToast('취소 처리됐어요', '#64748b');
-        }
-      }, "\uCDE8\uC18C"), canApprove && /*#__PURE__*/React.createElement(Btn, {
-        sm: true,
-        color: "outline",
-        onClick: () => {
-          if (!window.confirm('완전 삭제하시겠습니까?\n⚠️ 복구 불가능합니다!')) return;
-          setReceipts(prev => prev.filter(x => x.id !== r.id));
-          syncDB.delReceipt(r.id);
-          showToast('삭제됐어요', '#64748b');
-        }
-      }, "\uD83D\uDDD1\uFE0F"))));
-    })
-  })), modal && /*#__PURE__*/React.createElement(Modal, {
-    title: typeof modal === 'number' || typeof modal === 'string' && modal !== true ? '✏️ 수금 수정' : '💵 수금 등록',
-    onClose: () => setModal(false)
-  }, /*#__PURE__*/React.createElement(Grid2, null, /*#__PURE__*/React.createElement(FG, {
-    label: "\uB0A0\uC9DC"
-  }, /*#__PURE__*/React.createElement(Input, {
-    value: form.date,
-    onChange: v => setForm(f => ({
-      ...f,
-      date: v
-    })),
-    type: "date"
-  })), /*#__PURE__*/React.createElement(FG, {
-    label: "\uAC70\uB798\uCC98 *"
-  }, /*#__PURE__*/React.createElement(BuyerSelect, {
-    value: form.partner,
-    onChange: v => setForm(f => ({
-      ...f,
-      partner: v
-    }))
-  })), /*#__PURE__*/React.createElement(FG, {
-    label: "\uD488\uBAA9"
-  }, /*#__PURE__*/React.createElement(ProductSelect, {
-    value: form.item,
-    onChange: v => setForm(f => ({
-      ...f,
-      item: v
-    })),
-    onSelect: p => setForm(f => ({
-      ...f,
-      item: p.ko,
-      productId: p.id
-    })),
-    placeholder: "\uD488\uBAA9 \uAC80\uC0C9 \uB610\uB294 \uC9C1\uC811\uC785\uB825"
-  })), /*#__PURE__*/React.createElement(FG, {
-    label: "\uCCAD\uAD6C\uAE08\uC561 *"
-  }, /*#__PURE__*/React.createElement(Input, {
-    value: form.billed,
-    onChange: v => setForm(f => ({
-      ...f,
-      billed: v
-    })),
-    type: "number"
-  })), /*#__PURE__*/React.createElement(FG, {
-    label: "\uC218\uAE08\uC561"
-  }, /*#__PURE__*/React.createElement(Input, {
-    value: form.received,
-    onChange: v => setForm(f => ({
-      ...f,
-      received: v
-    })),
-    type: "number",
-    placeholder: "0"
-  })), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
-    label: "\uBE44\uACE0"
-  }, /*#__PURE__*/React.createElement(Input, {
-    value: form.note,
-    onChange: v => setForm(f => ({
-      ...f,
-      note: v
-    })),
-    placeholder: "\uBA54\uBAA8"
-  })))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 8,
-      justifyContent: 'flex-end',
-      marginTop: 12
-    }
-  }, /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => setModal(false),
-    color: "outline"
-  }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
-    onClick: save,
-    color: "blue"
-  }, "\u2705 \uB4F1\uB85D")))), bankModal && /*#__PURE__*/React.createElement(Modal, {
-    title: '\uD83D\uDCD1 \uD1B5\uC7A5\uB0B4\uC5ED \uC790\uB3D9 \uB9E4\uCE6D',
-    onClose: () => { setBankModal(null); setBankRows([]); setBankMatches([]); },
-    style: { width: '90%', maxWidth: 900 }
-  }, bankModal === 'upload' && /*#__PURE__*/React.createElement("div", null,
+  };
+  return /*#__PURE__*/React.createElement("div", null,
+    // 연체 필터 알림
+    receiptFilter === 'overdue' && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: 'linear-gradient(135deg,#fef2f2,#fee2e2)',
+        border: '2px solid #fca5a5',
+        borderRadius: 10,
+        padding: '12px 16px',
+        marginBottom: 12,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        flexWrap: 'wrap'
+      }
+    }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "⚠️"),
+       /*#__PURE__*/React.createElement("span", {
+         style: { flex: 1, fontSize: 13, fontWeight: 700, color: '#7f1d1d' }
+       }, "연체 필터 활성 - " + filteredRec.length + "건"),
+       /*#__PURE__*/React.createElement(Btn, {
+         onClick: () => setReceiptFilter(null),
+         color: 'outline',
+         sm: true
+       }, "✕ 필터 해제")),
+    // 헤더
     /*#__PURE__*/React.createElement("div", {
-      style: { background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 10, padding: '14px 16px', marginBottom: 16, fontSize: 13, color: '#1e3a8a' }
+      style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }
     }, /*#__PURE__*/React.createElement("div", {
-      style: { fontWeight: 700, marginBottom: 6 }
-    }, "\uD83D\uDCA1 \uC0AC\uC6A9 \uBC29\uBC95"), /*#__PURE__*/React.createElement("ol", {
-      style: { paddingLeft: 18, margin: 0, lineHeight: 1.7 }
-    }, /*#__PURE__*/React.createElement("li", null, "\uC740\uD589 \uC0AC\uC774\uD2B8\uC5D0\uC11C \uD1B5\uC7A5\uB0B4\uC5ED \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC"), /*#__PURE__*/React.createElement("li", null, "\uC544\uB798 \uC5C5\uB85C\uB4DC \uBC84\uD2BC \uD074\uB9AD"), /*#__PURE__*/React.createElement("li", null, "\uC2DC\uC2A4\uD15C\uC774 \uC785\uAE08 \uB0B4\uC5ED\uACFC \uBBF8\uC218\uAE08 \uB9E4\uCD9C \uC790\uB3D9 \uB9E4\uCE6D"), /*#__PURE__*/React.createElement("li", null, "\uD655\uC778 \uD6C4 \uC77C\uAD04 \uCC98\uB9AC")), /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 11, color: '#64748b', marginTop: 8 }
-    }, "\u2728 \uC9C0\uC6D0 \uC740\uD589: KB, \uC2E0\uD55C, \uC6B0\uB9AC, \uB18D\uD611, \uD558\uB098, IBK \uB4F1 (\uC774\uBA54\uC77C \uB0B4\uC6A9 \uD3EC\uD568)")),
-    bankRows.length === 0 ? /*#__PURE__*/React.createElement("label", {
-      style: { display: 'block', padding: 40, border: '2px dashed #93c5fd', borderRadius: 12, textAlign: 'center', cursor: 'pointer', background: '#f8fafc' }
+      style: { fontSize: 22, fontWeight: 800 }
+    }, "💵 수금관리"), /*#__PURE__*/React.createElement("div", {
+      style: { marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }
+    }, /*#__PURE__*/React.createElement(Btn, {
+      onClick: exportExcel,
+      color: 'outline'
+    }, "📄 엑셀"), editable && /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => {
+        setForm({ date: todayStr(), partner: '', item: '', billed: '', received: '', method: '', expectedDate: '', note: '' });
+        setModal(true);
+      },
+      color: 'blue'
+    }, "+ 수금 등록"))),
+    // 통계 카드
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginBottom: 16 }
+    }, [
+      { l: '청구 총액', v: totalBilled, c: '#1d4ed8', bg: '#eff6ff', border: '#93c5fd' },
+      { l: '수금 합계', v: totalReceived, c: '#15803d', bg: '#f0fdf4', border: '#86efac' },
+      { l: '미수금 합계', v: totalUnpaid, c: totalUnpaid > 0 ? '#dc2626' : '#64748b', bg: totalUnpaid > 0 ? '#fef2f2' : '#f8fafc', border: totalUnpaid > 0 ? '#fca5a5' : '#cbd5e1' }
+    ].map((s, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        background: s.bg,
+        border: '1.5px solid ' + s.border,
+        borderRadius: 12,
+        padding: '14px 16px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, color: '#64748b', marginBottom: 6 }
+    }, s.l), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 'clamp(15px,3vw,20px)', fontWeight: 800, color: s.c, fontFamily: 'monospace' }
+    }, won(s.v))))),
+    // 필터
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }
     }, /*#__PURE__*/React.createElement("input", {
-      type: "file",
-      accept: ".xlsx,.xls,.csv",
-      onChange: e => e.target.files[0] && handleBankUpload(e.target.files[0]),
-      style: { display: 'none' }
-    }), /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 32, marginBottom: 8 }
-    }, "\uD83D\uDCC2"), /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 14, fontWeight: 700, color: '#1e3a8a', marginBottom: 4 }
-    }, "\uC5D1\uC140 \uD30C\uC77C \uC120\uD0DD"), /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 11, color: '#64748b' }
-    }, ".xlsx, .xls, .csv \uC9C0\uC6D0")) :
-    /*#__PURE__*/React.createElement("div", null,
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', gap: 12, marginBottom: 12, padding: '10px 14px', background: '#f0fdf4', borderRadius: 8, fontSize: 12 }
-      }, /*#__PURE__*/React.createElement("span", {
-        style: { fontWeight: 700, color: '#15803d' }
-      }, "\uCD1D \uC785\uAE08 ", bankRows.length, "\uAC74"), /*#__PURE__*/React.createElement("span", null, "\u2022"), /*#__PURE__*/React.createElement("span", {
-        style: { color: '#1d4ed8' }
-      }, "\uC790\uB3D9 \uB9E4\uCE6D ", bankMatches.filter(m => m.confirmed).length, "\uAC74"), /*#__PURE__*/React.createElement("span", null, "\u2022"), /*#__PURE__*/React.createElement("span", {
-        style: { color: '#dc2626' }
-      }, "\uB9E4\uCE6D \uC548\uB428 ", bankMatches.filter(m => !m.confirmed).length, "\uAC74")),
-      /*#__PURE__*/React.createElement("div", {
-        style: { maxHeight: 400, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }
-      }, /*#__PURE__*/React.createElement("table", {
-        style: { width: '100%', borderCollapse: 'collapse', fontSize: 12 }
-      }, /*#__PURE__*/React.createElement("thead", {
-        style: { position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }
-      }, /*#__PURE__*/React.createElement("tr", null, ['확인','날짜','입금금액','적요','매칭된 매출','신뢰도'].map((h, i) => /*#__PURE__*/React.createElement("th", {
-        key: i,
-        style: { padding: '10px 8px', textAlign: i === 2 ? 'right' : 'left', fontSize: 11, color: '#475569', borderBottom: '1px solid #e2e8f0' }
-      }, h)))), /*#__PURE__*/React.createElement("tbody", null, bankMatches.map((m, i) => /*#__PURE__*/React.createElement("tr", {
-        key: m.id,
-        style: { borderBottom: '1px solid #f1f5f9', background: m.confirmed ? '#f0fdf4' : (m.match ? '#fef3c7' : '#fef2f2') }
-      }, /*#__PURE__*/React.createElement("td", {
-        style: { padding: '8px', textAlign: 'center' }
-      }, /*#__PURE__*/React.createElement("input", {
-        type: "checkbox",
-        checked: m.confirmed,
-        disabled: !m.match,
-        onChange: () => setBankMatches(prev => prev.map((x, j) => j === i ? { ...x, confirmed: !x.confirmed } : x)),
-        style: { cursor: m.match ? 'pointer' : 'not-allowed', width: 16, height: 16 }
-      })), /*#__PURE__*/React.createElement("td", {
-        style: { padding: '8px', whiteSpace: 'nowrap' }
-      }, m.date), /*#__PURE__*/React.createElement("td", {
-        style: { padding: '8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#15803d' }
-      }, m.amount.toLocaleString()), /*#__PURE__*/React.createElement("td", {
-        style: { padding: '8px', fontSize: 11, color: '#475569', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-      }, m.desc), /*#__PURE__*/React.createElement("td", {
-        style: { padding: '8px' }
-      }, m.match ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-        style: { fontWeight: 600, fontSize: 11 }
-      }, m.match.partner), /*#__PURE__*/React.createElement("div", {
-        style: { fontSize: 10, color: '#64748b' }
-      }, m.match.date, " \u00B7 \uCCAD\uAD6C ", (m.match.billed || 0).toLocaleString(), "\uC6D0")) : /*#__PURE__*/React.createElement("span", {
-        style: { color: '#dc2626', fontSize: 11 }
-      }, "\u26A0\uFE0F \uB9E4\uCE6D \uC548\uB428")), /*#__PURE__*/React.createElement("td", {
-        style: { padding: '8px' }
-      }, m.match ? /*#__PURE__*/React.createElement(Tag, {
-        c: m.score >= 90 ? 'green' : m.score >= 70 ? 'blue' : 'orange'
-      }, m.score, "%") : /*#__PURE__*/React.createElement(Tag, { c: 'red' }, "\u00D7")))))),
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }
-      }, /*#__PURE__*/React.createElement(Btn, {
-        onClick: () => { setBankRows([]); setBankMatches([]); },
-        color: "outline"
-      }, "\uB2E4\uC2DC \uC5C5\uB85C\uB4DC"), /*#__PURE__*/React.createElement(Btn, {
-        onClick: applyBankMatches,
-        color: "blue"
-      }, "\u2705 ", bankMatches.filter(m => m.confirmed).length, "\uAC74 \uC77C\uAD04 \uCC98\uB9AC"))))));
+      type: "text",
+      placeholder: "거래처 검색",
+      value: partnerFilter,
+      onChange: e => setPartnerFilter(e.target.value),
+      style: { padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13, minWidth: 120 }
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "date",
+      value: dateFrom,
+      onChange: e => setDateFrom(e.target.value),
+      style: { padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13 }
+    }), /*#__PURE__*/React.createElement("span", null, "~"), /*#__PURE__*/React.createElement("input", {
+      type: "date",
+      value: dateTo,
+      onChange: e => setDateTo(e.target.value),
+      style: { padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13 }
+    }), /*#__PURE__*/React.createElement("label", {
+      style: { fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      checked: showCanceled,
+      onChange: e => setShowCanceled(e.target.checked)
+    }), "취소 포함")),
+    // 수금 리스트 테이블
+    /*#__PURE__*/React.createElement(Card, null, filteredRec.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: { padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }
+    }, receipts.length === 0 ? "📋 수금 내역이 없습니다. 매출을 등록하면 자동으로 미수금이 생성됩니다." : "필터 조건에 맞는 수금이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+      style: { overflowX: 'auto' }
+    }, /*#__PURE__*/React.createElement("table", {
+      style: { width: '100%', fontSize: 12, borderCollapse: 'collapse' }
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
+      ['날짜', '거래처', '품목', '청구', '수금', '잔액', 'D-Day', '상태', '액션'].map(h => /*#__PURE__*/React.createElement("th", {
+        key: h,
+        style: { padding: '10px 8px', borderBottom: '2px solid #e2e8f0', background: '#f8fafc', fontSize: 11, fontWeight: 700, color: '#475569', textAlign: ['청구','수금','잔액'].includes(h) ? 'right' : 'left' }
+      }, h)))
+    ), /*#__PURE__*/React.createElement("tbody", null, filteredRec.map((r, idx) => {
+      const billed = Number(r.billed) || 0;
+      const received = Number(r.received) || 0;
+      const remain = billed - received;
+      const dday = getDday(r.expectedDate);
+      const isCanceled = r.status === '취소';
+      let ddayColor = '#64748b';
+      let ddayText = '-';
+      if (dday !== null && remain > 0) {
+        if (dday < -14) { ddayColor = '#dc2626'; ddayText = `D+${Math.abs(dday)} 연체`; }
+        else if (dday < -7) { ddayColor = '#ea580c'; ddayText = `D+${Math.abs(dday)}`; }
+        else if (dday < 0) { ddayColor = '#ca8a04'; ddayText = `D+${Math.abs(dday)}`; }
+        else if (dday === 0) { ddayColor = '#1d4ed8'; ddayText = 'D-DAY'; }
+        else if (dday <= 7) { ddayColor = '#15803d'; ddayText = `D-${dday}`; }
+        else { ddayColor = '#64748b'; ddayText = `D-${dday}`; }
+      }
+      return /*#__PURE__*/React.createElement("tr", {
+        key: r.id || idx,
+        style: { borderBottom: '1px solid #f1f5f9', opacity: isCanceled ? 0.5 : 1, textDecoration: isCanceled ? 'line-through' : 'none' }
+      },
+        /*#__PURE__*/React.createElement("td", { style: { padding: '8px', fontSize: 11 } }, r.date || '-'),
+        /*#__PURE__*/React.createElement("td", { style: { padding: '8px', fontWeight: 600 } }, r.partner || '-'),
+        /*#__PURE__*/React.createElement("td", { style: { padding: '8px', color: '#64748b' } }, r.item || '-'),
+        /*#__PURE__*/React.createElement("td", { style: { padding: '8px', textAlign: 'right', fontFamily: 'monospace' } }, won(billed)),
+        /*#__PURE__*/React.createElement("td", { style: { padding: '8px', textAlign: 'right', fontFamily: 'monospace', color: '#15803d', fontWeight: 600 } }, won(received)),
+        /*#__PURE__*/React.createElement("td", { style: { padding: '8px', textAlign: 'right', fontFamily: 'monospace', color: remain > 0 ? '#dc2626' : '#64748b', fontWeight: 700 } }, won(remain)),
+        /*#__PURE__*/React.createElement("td", { style: { padding: '8px', fontSize: 11, fontWeight: 700, color: ddayColor } }, ddayText),
+        /*#__PURE__*/React.createElement("td", { style: { padding: '8px' } }, /*#__PURE__*/React.createElement(Tag, {
+          c: isCanceled ? 'gray' : (remain <= 0 ? 'green' : 'orange')
+        }, isCanceled ? '취소' : (remain <= 0 ? '완료' : '미수'))),
+        /*#__PURE__*/React.createElement("td", { style: { padding: '8px' } }, !isCanceled && editable && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 4 } },
+          /*#__PURE__*/React.createElement(Btn, {
+            onClick: () => { setForm({ ...r, billed: String(r.billed || ''), received: String(r.received || '') }); setModal(r.id); },
+            color: 'outline', sm: true
+          }, "수정"),
+          /*#__PURE__*/React.createElement(Btn, {
+            onClick: () => cancel(r),
+            color: 'red', sm: true
+          }, "취소")))
+      );
+    }))))),
+    // 등록/수정 모달
+    modal && /*#__PURE__*/React.createElement(Modal, {
+      onClose: () => setModal(false),
+      title: typeof modal === 'number' || typeof modal === 'string' ? '수금 수정' : '수금 등록'
+    }, /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gap: 10 } },
+      /*#__PURE__*/React.createElement(FG, { label: '날짜' },
+        /*#__PURE__*/React.createElement(Input, { type: 'date', value: form.date, onChange: v => setForm(f => ({ ...f, date: v })) })),
+      /*#__PURE__*/React.createElement(FG, { label: '거래처 *' },
+        /*#__PURE__*/React.createElement(Sel, { value: form.partner, onChange: v => setForm(f => ({ ...f, partner: v })) },
+          /*#__PURE__*/React.createElement("option", { value: '' }, '거래처 선택'),
+          (buyers || []).map(b => /*#__PURE__*/React.createElement("option", { key: b.id, value: b.name }, b.name)))),
+      /*#__PURE__*/React.createElement(FG, { label: '품목' },
+        /*#__PURE__*/React.createElement(Input, { value: form.item, onChange: v => setForm(f => ({ ...f, item: v })), placeholder: '품목명' })),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } },
+        /*#__PURE__*/React.createElement(FG, { label: '청구액' },
+          /*#__PURE__*/React.createElement(Input, { type: 'number', value: form.billed, onChange: v => setForm(f => ({ ...f, billed: v })), placeholder: '0' })),
+        /*#__PURE__*/React.createElement(FG, { label: '수금액 *' },
+          /*#__PURE__*/React.createElement(Input, { type: 'number', value: form.received, onChange: v => setForm(f => ({ ...f, received: v })), placeholder: '0' }))),
+      /*#__PURE__*/React.createElement(FG, { label: '결제수단' },
+        /*#__PURE__*/React.createElement(Sel, { value: form.method, onChange: v => setForm(f => ({ ...f, method: v })) },
+          /*#__PURE__*/React.createElement("option", { value: '' }, '선택'),
+          /*#__PURE__*/React.createElement("option", { value: '계좌이체' }, '계좌이체'),
+          /*#__PURE__*/React.createElement("option", { value: 'T/T' }, 'T/T (수출)'),
+          /*#__PURE__*/React.createElement("option", { value: '현금' }, '현금'),
+          /*#__PURE__*/React.createElement("option", { value: '카드' }, '카드'),
+          /*#__PURE__*/React.createElement("option", { value: '어음' }, '어음'))),
+      /*#__PURE__*/React.createElement(FG, { label: '입금예정일' },
+        /*#__PURE__*/React.createElement(Input, { type: 'date', value: form.expectedDate, onChange: v => setForm(f => ({ ...f, expectedDate: v })) })),
+      /*#__PURE__*/React.createElement(FG, { label: '비고' },
+        /*#__PURE__*/React.createElement(Input, { value: form.note, onChange: v => setForm(f => ({ ...f, note: v })), placeholder: '메모' })),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 } },
+        /*#__PURE__*/React.createElement(Btn, { onClick: () => setModal(false), color: 'outline' }, '취소'),
+        /*#__PURE__*/React.createElement(Btn, { onClick: save }, '✅ 저장'))))
+  );
 }
+
 function PaymentPage() {
   const {
     payments,
