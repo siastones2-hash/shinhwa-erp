@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1719 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1730 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -1841,6 +1841,10 @@ function App() {
   const [selectedBuyer, setSelectedBuyer] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [page, setPage] = useState('dash');
+  // 디버그: 페이지 변경 감지
+  useEffect(() => {
+    console.log('📍 현재 페이지:', page, '| 사용자:', user?.name, '| role:', user?.role);
+  }, [page, user]);
   const [receiptFilter, setReceiptFilter] = useState(null);
   const [toast, setToast] = useState(null);
   const [dbReady, setDbReady] = useState(false);
@@ -2339,9 +2343,9 @@ function App() {
     if (!user) return false;
     // 도움말은 모든 로그인 사용자 접근 가능
     if (menuId === 'help') return true;
-    // 대표는 무조건 모든 권한
-    if (user.role === 'ceo') return true;
-    // 관리자/전무는 모든 권한 자동 (대표가 명시적으로 false 설정한 경우만 차단)
+    // 신현민 또는 ceo는 무조건 모든 권한 (이름/ID/role 어느 것이라도 매칭)
+    if (user.role === 'ceo' || user.name === '신현민' || user.id === 'u001' || user.email === 'shi9249') return true;
+    // 관리자/전무
     if (user.role === 'admin' || user.role === 'vice') {
       const p = user.permissions ? user.permissions[menuId] : null;
       if (p && p.view === false) return false;
@@ -2353,8 +2357,8 @@ function App() {
       const p = user.permissions ? user.permissions[menuId] : null;
       return p ? !!p.view : false;
     }
-    // role이 정의되지 않거나 알 수 없는 값이면: 안전하게 ceo로 처리 (옛날 데이터 호환)
-    // 'admin', 'manager', 'vice', '대표' 등 어떤 값이라도 일단 모든 권한 부여
+    // role이 정의되지 않거나 알 수 없는 값 → 안전하게 모든 권한 부여
+    console.warn('⚠️ 알 수 없는 role:', user.role, '- 안전 모드로 모든 권한 부여');
     return true;
   };
   const canEdit = menuId => {
@@ -6114,6 +6118,7 @@ function ProductSelect({
   }, "\uC6D0\uAC00 ", won(p.cost)))))));
 }
 function SalesPage() {
+  console.log('🟢 SalesPage 렌더링 시작');
   const {
     sales,
     setSales,
@@ -7086,6 +7091,7 @@ function SalesPage() {
   }, "➕ ", importSalesPreview.length, "건 모두 등록"))));
 }
 function PurchasePage() {
+  console.log('🟢 PurchasePage 렌더링 시작');
   const {
     purchases,
     setPurchases,
@@ -10102,6 +10108,7 @@ function BuyerDetailPage() {
 }
 
 function BuyersPage() {
+  console.log('🟢 BuyersPage 렌더링 시작');
   const {
     buyers,
     setBuyers,
