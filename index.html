@@ -11464,11 +11464,11 @@ function MyPage() {
   useEffect(() => {
     const lastBackup = localStorage.getItem('last_backup_date');
     const today = new Date();
-    const dayOfWeek = today.getDay(); // 0=일, 1=월...
+    const dayOfWeek = today.getDay();
+    let timer = null;
     if (dayOfWeek === 1) {
-      // 매주 월요일
       if (!lastBackup || new Date(lastBackup) < new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)) {
-        setTimeout(() => {
+        timer = setTimeout(() => {
           if (window.confirm('📦 주간 데이터 백업 알림!\n\n지난 한 주간의 데이터를 백업하시겠습니까?\n(취소하면 다음 주에 다시 알림)')) {
             {
               exportAll();
@@ -11478,6 +11478,9 @@ function MyPage() {
         }, 2000);
       }
     }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, []);
   const exportAll = () => {
     const data = {
@@ -11767,15 +11770,6 @@ function UsersPage() {
     syncDB,
     user
   } = useAuth();
-  if (user?.role !== 'ceo' && user?.role !== 'admin') {
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: 40,
-        textAlign: 'center',
-        color: '#94a3b8'
-      }
-    }, "\u26D4 \uC811\uADFC \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
-  }
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -11785,6 +11779,15 @@ function UsersPage() {
     permissions: {},
     active: true
   });
+  if (user?.role !== 'ceo' && user?.role !== 'admin') {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: 40,
+        textAlign: 'center',
+        color: '#94a3b8'
+      }
+    }, "\u26D4 \uC811\uADFC \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
+  }
   const MENUS2 = [{
     id: 'products',
     label: '상품/단가'
@@ -12130,6 +12133,8 @@ function ApprovalPage() {
     canApprove,
     syncDB
   } = useAuth();
+  const [comment, setComment] = useState('');
+  const [commentId, setCommentId] = useState(null);
   if (!['ceo', 'admin', 'vice'].includes(user?.role)) {
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -12139,8 +12144,6 @@ function ApprovalPage() {
       }
     }, "\u26D4 \uC2B9\uC778 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
   }
-  const [comment, setComment] = useState('');
-  const [commentId, setCommentId] = useState(null);
   const typeLabel = {
     sales_add: '💰 매출 등록',
     sales_edit: '💰 매출 수정',
