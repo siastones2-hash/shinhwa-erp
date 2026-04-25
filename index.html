@@ -6816,6 +6816,19 @@ function ReceiptPage() {
   const [partnerFilter, setPartnerFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [modal, setModal] = useState(false);
+  const [bankModal, setBankModal] = useState(null);
+  const [bankRows, setBankRows] = useState([]);
+  const [bankMatches, setBankMatches] = useState([]);
+  const [showCanceledR, setShowCanceledR] = useState(false);
+  const [form, setForm] = useState({
+    date: todayStr(),
+    partner: '',
+    item: '',
+    billed: '',
+    received: '',
+    note: ''
+  });
   const getDday = expectedDate => {
     if (!expectedDate) return null;
     const diff = Math.floor((new Date(expectedDate) - new Date()) / (1000 * 60 * 60 * 24));
@@ -6827,36 +6840,24 @@ function ReceiptPage() {
       bg: '#fef2f2',
       border: '#fca5a5',
       text: '#dc2626'
-    }; // 14일 초과 연체 - 빨강
+    };
     if (dday < -7) return {
       bg: '#fff7ed',
       border: '#fed7aa',
       text: '#ea580c'
-    }; // 7일 초과 - 주황
+    };
     if (dday < 0) return {
       bg: '#fefce8',
       border: '#fef08a',
       text: '#ca8a04'
-    }; // 연체 - 노랑
+    };
     if (dday === 0) return {
       bg: '#eff6ff',
       border: '#bfdbfe',
       text: '#1d4ed8'
-    }; // 오늘
+    };
     return null;
   };
-  const [modal, setModal] = useState(false);
-  const [bankModal, setBankModal] = useState(null);
-  const [bankRows, setBankRows] = useState([]);
-  const [bankMatches, setBankMatches] = useState([]);
-  const [form, setForm] = useState({
-    date: todayStr(),
-    partner: '',
-    item: '',
-    billed: '',
-    received: '',
-    note: ''
-  });
   const editable = canEdit('receipt');
   // === 통장 매칭 함수들 ===
   const handleBankUpload = (file) => {
@@ -7065,7 +7066,6 @@ function ReceiptPage() {
     setModal(false);
     showToast('✅ 수금 등록!');
   };
-  const [showCanceledR, setShowCanceledR] = useState(false);
   const filteredRec = receipts.filter(r => {
     if (!showCanceledR && r.status === '취소') return false;
     if (partnerFilter && !(r.partner || '').includes(partnerFilter)) return false;
