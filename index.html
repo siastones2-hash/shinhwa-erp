@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1609 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1631 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -2041,20 +2041,30 @@ function App() {
   const syncDB = {
     users: async data => {
       try {
-        // role 검증: Supabase에 등록된 값만 허용 (vice는 admin으로 변환)
+        // role 검증: Supabase erp_users 테이블에 등록된 값만 허용
         const validRoles = ['ceo', 'admin', 'staff'];
-        const cleaned = data.map(u => ({
-          id: u.id || ('u' + Date.now()),
-          name: u.name || '',
-          email: u.email || '',
-          password: u.password || '1234',
-          role: validRoles.includes(u.role) ? u.role : (u.role === 'vice' ? 'admin' : 'staff'),
-          permissions: u.permissions || {},
-          active: u.active !== false,
-          phone: u.phone || '',
-          dept: u.dept || ''
-        }));
-        await sb.replace('erp_users', cleaned);
+        const cleaned = data.map(u => {
+          const safeRole = validRoles.includes(u.role) ? u.role : (u.role === 'vice' ? 'admin' : 'staff');
+          return {
+            id: String(u.id || ('u' + Date.now())),
+            name: String(u.name || ''),
+            email: String(u.email || ''),
+            password: String(u.password || '1234'),
+            role: safeRole,
+            permissions: u.permissions && typeof u.permissions === 'object' ? u.permissions : {},
+            active: u.active !== false,
+            phone: String(u.phone || ''),
+            dept: String(u.dept || '')
+          };
+        });
+        // upsert 단건씩 - replace는 일괄삭제 후 재생성이라 RLS/제약 충돌 가능
+        for (const u of cleaned) {
+          try {
+            await sb.upsert('erp_users', u);
+          } catch (innerErr) {
+            console.warn('user upsert skip:', u.id, u.name, innerErr.message || innerErr);
+          }
+        }
       } catch (e) {
         console.error('sync users:', e);
       }
@@ -2391,7 +2401,11 @@ function App() {
     id: 'users',
     icon: '👥',
     label: '직원관리'
-  }] : [])];
+  }] : [{
+    id: 'approval',
+    icon: '📋',
+    label: '내 결재 현황'
+  }])];
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const bottomMenus = visibleMenus.slice(0, 5);
   return /*#__PURE__*/React.createElement(AuthCtx.Provider, {
@@ -2649,7 +2663,7 @@ function App() {
       padding: 20,
       minWidth: 0
     }
-  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CbmPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), 
+  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && user && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CbmPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), 
     // 권한 차단 안내 (페이지는 매칭되는데 canView가 false인 경우)
     ['products','stock','sales','purchase','receipt','payment','tax','quote','buyers','pricelist','schedule','invoice'].includes(page) && !canView(page) && /*#__PURE__*/React.createElement("div", {
       style: { padding: 40, textAlign: 'center' }
@@ -2756,6 +2770,12 @@ function DashPage() {
     setSelectedBuyer,
     showToast
   } = useAuth();
+  // 무결성: 취소된 데이터 제외 후 계산
+  const safeSales = (sales || []).filter(s => s && s.status !== '취소');
+  const safePurchases = (purchases || []).filter(p => p && p.status !== '취소');
+  const safeReceipts = (receipts || []).filter(r => r && r.status !== '취소');
+  const safePayments = (payments || []).filter(p => p && p.status !== '취소');
+
   // 마지막 백업 날짜 체크 (대표/관리자/전무만 알림 표시)
   const lastBackup = LS.get('last_backup_date', null);
   const daysSinceBackup = useMemo(() => {
@@ -2850,12 +2870,12 @@ function DashPage() {
   const now = new Date();
   const thisMonth = now.toISOString().slice(0, 7);
   const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
-  const mSales = sales.filter(s => s.date?.startsWith(thisMonth)).reduce((a, s) => a + (s.total || 0), 0);
-  const lmSales = sales.filter(s => s.date?.startsWith(lastMonth)).reduce((a, s) => a + (s.total || 0), 0);
-  const mPurchase = purchases.filter(s => s.date?.startsWith(thisMonth)).reduce((a, s) => a + (s.total || 0), 0);
-  const lmPurchase = purchases.filter(s => s.date?.startsWith(lastMonth)).reduce((a, s) => a + (s.total || 0), 0);
-  const unpaid = receipts.reduce((a, r) => a + Math.max(0, (r.billed || 0) - (r.received || 0)), 0);
-  const unpay = payments.reduce((a, r) => a + Math.max(0, (r.billed || 0) - (r.paid || 0)), 0);
+  const mSales = safeSales.filter(s => s.date?.startsWith(thisMonth)).reduce((a, s) => a + (s.total || 0), 0);
+  const lmSales = safeSales.filter(s => s.date?.startsWith(lastMonth)).reduce((a, s) => a + (s.total || 0), 0);
+  const mPurchase = safePurchases.filter(s => s.date?.startsWith(thisMonth)).reduce((a, s) => a + (s.total || 0), 0);
+  const lmPurchase = safePurchases.filter(s => s.date?.startsWith(lastMonth)).reduce((a, s) => a + (s.total || 0), 0);
+  const unpaid = safeReceipts.reduce((a, r) => a + Math.max(0, (r.billed || 0) - (r.received || 0)), 0);
+  const unpay = safePayments.reduce((a, r) => a + Math.max(0, (r.billed || 0) - (r.paid || 0)), 0);
   // 손익 계산
   const mProfit = mSales - mPurchase;
   const lmProfit = lmSales - lmPurchase;
@@ -2863,8 +2883,8 @@ function DashPage() {
   // 재고자산 (현재고 × 원가)
   const stockAsset = products.reduce((a, p) => a + getStock(p.id) * (p.cost || 0), 0);
   // 누적 매출/매입/이익
-  const totalSales = sales.reduce((a, s) => a + (s.total || 0), 0);
-  const totalPurchase = purchases.reduce((a, s) => a + (s.total || 0), 0);
+  const totalSales = safeSales.reduce((a, s) => a + (s.total || 0), 0);
+  const totalPurchase = safePurchases.reduce((a, s) => a + (s.total || 0), 0);
   const totalProfit = totalSales - totalPurchase;
   // 최근 6개월 차트 데이터
   const chartMonths = Array.from({
@@ -2873,8 +2893,8 @@ function DashPage() {
     const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const label = `${d.getMonth() + 1}월`;
-    const ms = sales.filter(s => s.date?.startsWith(key)).reduce((a, s) => a + (s.total || 0), 0);
-    const mp = purchases.filter(s => s.date?.startsWith(key)).reduce((a, s) => a + (s.total || 0), 0);
+    const ms = safeSales.filter(s => s.date?.startsWith(key)).reduce((a, s) => a + (s.total || 0), 0);
+    const mp = safePurchases.filter(s => s.date?.startsWith(key)).reduce((a, s) => a + (s.total || 0), 0);
     return {
       label,
       ms,
@@ -2886,8 +2906,8 @@ function DashPage() {
 
   // 상품별 수익 계산
   const productProfit = products.map(p => {
-    const soldQty = sales.filter(s => s.productId === p.id || s.item === p.ko).reduce((a, s) => a + (s.qty || 1), 0);
-    const revenue = sales.filter(s => s.productId === p.id || s.item === p.ko).reduce((a, s) => a + (s.total || 0), 0);
+    const soldQty = safeSales.filter(s => s.productId === p.id || s.item === p.ko).reduce((a, s) => a + (s.qty || 1), 0);
+    const revenue = safeSales.filter(s => s.productId === p.id || s.item === p.ko).reduce((a, s) => a + (s.total || 0), 0);
     const cost = soldQty * (p.cost || 0);
     return {
       ...p,
@@ -2906,7 +2926,7 @@ function DashPage() {
     return d >= 0 && d <= 3 && s.status !== '완료';
   });
   // 연체 미수금 D-Day
-  const overdueReceipts2 = receipts.filter(r => {
+  const overdueReceipts2 = safeReceipts.filter(r => {
     const remaining = Math.max(0, (r.billed || 0) - (r.received || 0));
     const overdue = r.expectedDate && r.expectedDate && new Date(r.expectedDate) < new Date();
     return remaining > 0 && overdue && r.status !== '취소';
@@ -2914,7 +2934,7 @@ function DashPage() {
     ...r,
     dday: Math.floor((new Date() - new Date(r.expectedDate)) / (1000 * 60 * 60 * 24))
   })).sort((a, b) => b.dday - a.dday);
-  const overdueReceipts = receipts.filter(r => {
+  const overdueReceipts = safeReceipts.filter(r => {
     const remain = (r.billed || 0) - (r.received || 0);
     if (remain <= 0) return false;
     const days = Math.ceil((new Date(todayStr()) - new Date(r.date || todayStr())) / (1000 * 60 * 60 * 24));
@@ -2933,7 +2953,7 @@ function DashPage() {
     return {
       key,
       label: `${d.getMonth() + 1}월`,
-      amt: sales.filter(s => s.date?.startsWith(key)).reduce((a, s) => a + (s.total || 0), 0)
+      amt: safeSales.filter(s => s.date?.startsWith(key)).reduce((a, s) => a + (s.total || 0), 0)
     };
   });
   const maxTrend = Math.max(...trend.map(t => t.amt), 1);
@@ -2948,14 +2968,14 @@ function DashPage() {
     }
   }, val >= 0 ? '▲' : '▼', Math.abs(val), "%");
   const brandSales = {};
-  sales.filter(s => s.date?.startsWith(thisMonth)).forEach(s => {
+  safeSales.filter(s => s.date?.startsWith(thisMonth)).forEach(s => {
     const prod = products.find(p => p.ko === s.item || p.id === s.productId);
     const brand = prod?.brand || '기타';
     brandSales[brand] = (brandSales[brand] || 0) + (s.total || 0);
   });
   const topBrands = Object.entries(brandSales).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const todayDate = todayStr();
-  const todayExpected = receipts.filter(r => r.expectedDate === todayDate && r.status !== '취소').reduce((a, r) => a + Math.max(0, (r.billed || 0) - (r.received || 0)), 0);
+  const todayExpected = safeReceipts.filter(r => r.expectedDate === todayDate && r.status !== '취소').reduce((a, r) => a + Math.max(0, (r.billed || 0) - (r.received || 0)), 0);
   return /*#__PURE__*/React.createElement("div", null,
     // 💾 백업 알림 (7일 이상 안 했을 때)
     showBackupAlert && /*#__PURE__*/React.createElement("div", {
@@ -3112,7 +3132,7 @@ function DashPage() {
   }, {
     label: '미수금 합계',
     value: won(unpaid),
-    sub: `${receipts.filter(r => Math.max(0, (r.billed || 0) - (r.received || 0)) > 0 && r.status !== '취소').length}건 미수`,
+    sub: `${safeReceipts.filter(r => Math.max(0, (r.billed || 0) - (r.received || 0)) > 0 && r.status !== '취소').length}건 미수`,
     color: '#dc2626',
     bg: 'linear-gradient(135deg,#fef2f2,#fee2e2)',
     border: '#fca5a5',
@@ -6057,8 +6077,9 @@ function SalesPage() {
     }
     const total2 = form.taxType === '부가세포함' ? supply : supply + vat;
     if (editTarget) {
+      const oldSale = sales.find(x => x.id === editTarget) || {};
       const updated2 = {
-        ...(sales.find(x => x.id === editTarget) || {}),
+        ...oldSale,
         ...form,
         supply,
         vat,
@@ -6066,7 +6087,59 @@ function SalesPage() {
       };
       setSales(prev => prev.map(x => x.id === editTarget ? updated2 : x));
       syncDB.sale(updated2);
-      showToast('✅ 매출 수정 완료!');
+      // 🔄 연쇄: 매출 수정 시 재고 / 미수금 자동 조정
+      // 1) 수량 변경 → 재고 차이만큼 조정
+      const oldQty = Number(oldSale.qty) || 0;
+      const newQty = Number(form.qty) || 0;
+      const oldProductId = oldSale.productId;
+      const newProductId = form.productId;
+      if (oldProductId && oldQty > 0 && (oldProductId !== newProductId || oldQty !== newQty)) {
+        // 옛 출고 취소 (재고 +)
+        const restoreOld = {
+          id: Date.now() + Math.random(),
+          date: todayStr(),
+          productId: oldProductId,
+          type: 'in',
+          qty: oldQty,
+          note: '매출 수정으로 옛 출고 복구 (전표: ' + (oldSale.docNo || oldSale.id) + ')',
+          autoGenerated: true
+        };
+        setStocks(prev => [...(prev || []), restoreOld]);
+        if (syncDB.stock) syncDB.stock(restoreOld);
+      }
+      if (newProductId && newQty > 0 && (oldProductId !== newProductId || oldQty !== newQty)) {
+        // 새 출고 추가 (재고 -)
+        const newOut = {
+          id: Date.now() + Math.random() + 1,
+          date: form.date,
+          productId: newProductId,
+          type: 'out',
+          qty: newQty,
+          note: '매출 수정으로 새 출고 (전표: ' + (oldSale.docNo || oldSale.id) + ')',
+          autoGenerated: true
+        };
+        setStocks(prev => [...(prev || []), newOut]);
+        if (syncDB.stock) syncDB.stock(newOut);
+      }
+      // 2) 금액/거래처 변경 → 자동 생성된 미수금 조정
+      if (setReceipts) {
+        setReceipts(prev => (prev || []).map(r => {
+          if (r.fromSaleId === editTarget || r.linkedSaleId === editTarget || r.salesId === editTarget) {
+            const updRec = {
+              ...r,
+              partner: form.partner,
+              item: form.item || r.item,
+              billed: total2,
+              date: form.date,
+              note: '매출 수정 반영 (' + (oldSale.docNo || '') + ')'
+            };
+            if (syncDB.receipt) syncDB.receipt(updRec);
+            return updRec;
+          }
+          return r;
+        }));
+      }
+      showToast('✅ 매출 + 재고/미수금 자동 동기화!');
       setEditTarget(null);
     } else {
       const entry = {
@@ -6120,6 +6193,9 @@ function SalesPage() {
             expectedDate,
             note: '매출 자동 생성 (' + (entry.docNo || '') + ')',
             salesId: entry.id,
+            fromSaleId: entry.id,
+            linkedSaleId: entry.id,
+            autoGenerated: true,
             status: '미수'
           };
           setReceipts(prev => [...prev, newReceipt]);
@@ -6496,17 +6572,67 @@ function SalesPage() {
         };
         setSales(prev => prev.map(x => x.id === s.id ? upd : x));
         syncDB.sale(upd);
+        // 🔄 연쇄 처리: 매출 취소 → 자동 생성된 미수금/재고 원복
+        // 1) 자동 생성된 미수금(receipts) 취소 처리
+        if (setReceipts) {
+          setReceipts(prev => (prev || []).map(r => {
+            if (r.fromSaleId === s.id || r.linkedSaleId === s.id || r.salesId === s.id) {
+              const cancelRec = { ...r, status: '취소', canceledAt: todayStr(), canceledBy: user.name, cancelReason: '매출 취소로 자동 취소' };
+              if (syncDB.receipt) syncDB.receipt(cancelRec);
+              return cancelRec;
+            }
+            return r;
+          }));
+        }
+        // 2) 차감된 재고 복구 (재고 출고 기록을 입고로 상쇄)
+        if (s.productId && s.qty > 0 && setStocks) {
+          const restoreStock = {
+            id: Date.now() + Math.random(),
+            date: todayStr(),
+            productId: s.productId,
+            type: 'in',
+            qty: Number(s.qty) || 0,
+            note: '매출 취소로 자동 재고 복구 (원전표: ' + (s.docNo || s.id) + ')',
+            relatedSaleId: s.id,
+            autoGenerated: true
+          };
+          setStocks(prev => [...(prev || []), restoreStock]);
+          if (syncDB.stock) syncDB.stock(restoreStock);
+        }
         setShowCanceled(false);
-        showToast('취소 처리됐어요', '#64748b');
+        showToast('취소 + 미수금/재고 자동 원복!', '#64748b');
       },
       color: "red",
       sm: true
     }, "\uCDE8\uC18C"), canApprove && /*#__PURE__*/React.createElement(Btn, {
       onClick: () => {
         if (!window.confirm('완전 삭제하시겠습니까?\n⚠️ 복구 불가능합니다!')) return;
+        // 🔄 연쇄 처리: 매출 삭제 → 자동 생성된 미수금/재고도 같이 정리
+        // 1) 자동 생성된 미수금 삭제
+        if (setReceipts) {
+          setReceipts(prev => {
+            const toDelete = (prev || []).filter(r => r.fromSaleId === s.id || r.linkedSaleId === s.id || r.salesId === s.id);
+            toDelete.forEach(r => { if (syncDB.delReceipt) syncDB.delReceipt(r.id); });
+            return (prev || []).filter(r => r.fromSaleId !== s.id && r.linkedSaleId !== s.id && r.salesId !== s.id);
+          });
+        }
+        // 2) 차감된 재고 복구
+        if (s.productId && s.qty > 0 && setStocks) {
+          const restoreStock = {
+            id: Date.now() + Math.random(),
+            date: todayStr(),
+            productId: s.productId,
+            type: 'in',
+            qty: Number(s.qty) || 0,
+            note: '매출 삭제로 자동 재고 복구 (원전표: ' + (s.docNo || s.id) + ')',
+            autoGenerated: true
+          };
+          setStocks(prev => [...(prev || []), restoreStock]);
+          if (syncDB.stock) syncDB.stock(restoreStock);
+        }
         setSales(prev => prev.filter(x => x.id !== s.id));
         syncDB.delSale(s.id);
-        showToast('삭제됐어요', '#64748b');
+        showToast('삭제 + 미수금/재고 자동 정리!', '#64748b');
       },
       color: "outline",
       sm: true
@@ -6737,8 +6863,9 @@ function PurchasePage() {
     }
     const total2 = form.taxType === '부가세포함' ? supply : supply + vat;
     if (editTarget) {
+      const oldPurchase = purchases.find(x => x.id === editTarget) || {};
       const updated = {
-        ...purchases.find(x => x.id === editTarget),
+        ...oldPurchase,
         ...form,
         supply,
         vat,
@@ -6746,7 +6873,59 @@ function PurchasePage() {
       };
       setPurchases(prev => prev.map(x => x.id === editTarget ? updated : x));
       syncDB.purchase(updated);
-      showToast('✅ 매입 수정 완료!');
+      // 🔄 연쇄: 매입 수정 시 재고 / 미지급 자동 조정
+      const oldQty = Number(oldPurchase.qty) || 0;
+      const newQty = Number(form.qty) || 0;
+      const oldPid = oldPurchase.productId;
+      const newPid = form.productId;
+      // 1) 수량 변경 → 재고 차이만큼 조정
+      if (oldPid && oldQty > 0 && (oldPid !== newPid || oldQty !== newQty)) {
+        // 옛 입고 취소 (재고 -)
+        const reverseOld = {
+          id: Date.now() + Math.random(),
+          date: todayStr(),
+          productId: oldPid,
+          type: 'out',
+          qty: oldQty,
+          note: '매입 수정으로 옛 입고 취소 (전표: ' + (oldPurchase.docNo || oldPurchase.id) + ')',
+          autoGenerated: true
+        };
+        setStocks(prev => [...(prev || []), reverseOld]);
+        if (syncDB.stock) syncDB.stock(reverseOld);
+      }
+      if (newPid && newQty > 0 && (oldPid !== newPid || oldQty !== newQty)) {
+        // 새 입고 추가 (재고 +)
+        const newIn = {
+          id: Date.now() + Math.random() + 1,
+          date: form.date,
+          productId: newPid,
+          type: 'in',
+          qty: newQty,
+          note: '매입 수정으로 새 입고 (전표: ' + (oldPurchase.docNo || oldPurchase.id) + ')',
+          autoGenerated: true
+        };
+        setStocks(prev => [...(prev || []), newIn]);
+        if (syncDB.stock) syncDB.stock(newIn);
+      }
+      // 2) 금액/거래처 변경 → 미지급 자동 조정
+      if (setPayments) {
+        setPayments(prev => (prev || []).map(p => {
+          if (p.fromPurchaseId === editTarget || p.linkedPurchaseId === editTarget || p.purchaseId === editTarget) {
+            const updPay = {
+              ...p,
+              partner: form.partner,
+              item: form.item || p.item,
+              billed: total2,
+              date: form.date,
+              note: '매입 수정 반영 (' + (oldPurchase.docNo || '') + ')'
+            };
+            if (syncDB.payment) syncDB.payment(updPay);
+            return updPay;
+          }
+          return p;
+        }));
+      }
+      showToast('✅ 매입 + 재고/미지급 자동 동기화!');
       setEditTarget(null);
     } else {
       const pEntry = {
@@ -6802,6 +6981,9 @@ function PurchasePage() {
           expectedDate,
           note: '매입 자동 생성 (' + (pEntry.docNo || '') + ')',
           purchaseId: pEntry.id,
+          fromPurchaseId: pEntry.id,
+          linkedPurchaseId: pEntry.id,
+          autoGenerated: true,
           status: '미지급'
         };
         setPayments(prev => [...prev, newPayment]);
@@ -7132,17 +7314,65 @@ function PurchasePage() {
         };
         setPurchases(prev => prev.map(x => x.id === s.id ? upd : x));
         syncDB.purchase(upd);
+        // 🔄 연쇄 처리: 매입 취소 → 자동 생성된 미지급/재고 원복
+        // 1) 자동 생성된 미지급(payments) 취소
+        if (setPayments) {
+          setPayments(prev => (prev || []).map(p => {
+            if (p.fromPurchaseId === s.id || p.linkedPurchaseId === s.id || p.purchaseId === s.id) {
+              const cancelPay = { ...p, status: '취소', canceledAt: todayStr(), canceledBy: user.name, cancelReason: '매입 취소로 자동 취소' };
+              if (syncDB.payment) syncDB.payment(cancelPay);
+              return cancelPay;
+            }
+            return p;
+          }));
+        }
+        // 2) 입고된 재고 차감 (재고 입고 → 출고로 상쇄)
+        if (s.productId && s.qty > 0 && setStocks) {
+          const reverseStock = {
+            id: Date.now() + Math.random(),
+            date: todayStr(),
+            productId: s.productId,
+            type: 'out',
+            qty: Number(s.qty) || 0,
+            note: '매입 취소로 자동 재고 차감 (원전표: ' + (s.docNo || s.id) + ')',
+            relatedPurchaseId: s.id,
+            autoGenerated: true
+          };
+          setStocks(prev => [...(prev || []), reverseStock]);
+          if (syncDB.stock) syncDB.stock(reverseStock);
+        }
         setShowCanceledP(false);
-        showToast('취소 처리됐어요', '#64748b');
+        showToast('취소 + 미지급/재고 자동 원복!', '#64748b');
       },
       color: "red",
       sm: true
     }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
       onClick: () => {
         if (!window.confirm('완전 삭제하시겠습니까?\n⚠️ 복구 불가능합니다!')) return;
+        // 🔄 연쇄 처리: 매입 삭제 → 자동 생성된 미지급/재고 정리
+        if (setPayments) {
+          setPayments(prev => {
+            const toDelete = (prev || []).filter(p => p.fromPurchaseId === s.id || p.linkedPurchaseId === s.id || p.purchaseId === s.id);
+            toDelete.forEach(p => { if (syncDB.delPayment) syncDB.delPayment(p.id); });
+            return (prev || []).filter(p => p.fromPurchaseId !== s.id && p.linkedPurchaseId !== s.id && p.purchaseId !== s.id);
+          });
+        }
+        if (s.productId && s.qty > 0 && setStocks) {
+          const reverseStock = {
+            id: Date.now() + Math.random(),
+            date: todayStr(),
+            productId: s.productId,
+            type: 'out',
+            qty: Number(s.qty) || 0,
+            note: '매입 삭제로 자동 재고 차감 (원전표: ' + (s.docNo || s.id) + ')',
+            autoGenerated: true
+          };
+          setStocks(prev => [...(prev || []), reverseStock]);
+          if (syncDB.stock) syncDB.stock(reverseStock);
+        }
         setPurchases(prev => prev.filter(x => x.id !== s.id));
         syncDB.delPurchase(s.id);
-        showToast('삭제됐어요', '#64748b');
+        showToast('삭제 + 미지급/재고 자동 정리!', '#64748b');
       },
       color: "outline",
       sm: true
@@ -7389,7 +7619,26 @@ function ReceiptPage() {
     const updated = { ...r, status: '취소' };
     setReceipts(prev => (prev || []).map(x => x.id === r.id ? updated : x));
     if (syncDB.receipt) syncDB.receipt(updated);
-    showToast('✅ 취소 처리됨');
+    // 🔄 연쇄: 수금 취소 → 매출 collected: false로 원복
+    if (setSales && r.partner) {
+      setSales(prev => (prev || []).map(s => {
+        if (s.partner === r.partner && s.collected === true) {
+          // 같은 거래처의 다른 수금이 더 있는지 확인 (취소 안 된 것)
+          const otherActiveReceipts = (receipts || []).filter(x => 
+            x.id !== r.id && 
+            x.partner === r.partner && 
+            x.status !== '취소' && 
+            (Number(x.received) || 0) > 0
+          );
+          // 다른 활성 수금이 없으면 collected 해제
+          if (otherActiveReceipts.length === 0) {
+            return { ...s, collected: false };
+          }
+        }
+        return s;
+      }));
+    }
+    showToast('✅ 취소 + 매출 수금완료 자동 해제');
   };
   // 엑셀 다운로드
   const exportExcel = () => {
@@ -13353,30 +13602,35 @@ function UsersPage() {
     setModal(false);
   };
   const togglePerm = (uid, menuId, type) => {
-    setUsers(prev => prev.map(u => {
-      if (u.id !== uid) return u;
-      const p = { ...u.permissions };
-      if (!p[menuId]) {
-        p[menuId] = { view: false, create: false, update: false, delete: false };
+    setUsers(prev => {
+      const updated = prev.map(u => {
+        if (u.id !== uid) return u;
+        const p = { ...u.permissions };
+        if (!p[menuId]) {
+          p[menuId] = { view: false, create: false, update: false, delete: false };
+        }
+        let currentValue;
+        if (type === 'view') {
+          currentValue = p[menuId].view || false;
+        } else {
+          currentValue = p[menuId][type] !== undefined ? p[menuId][type] : (p[menuId].edit || false);
+        }
+        p[menuId] = { ...p[menuId], [type]: !currentValue };
+        if (type !== 'view') {
+          p[menuId].edit = (p[menuId].create || false) || (p[menuId].update || false) || (p[menuId].delete || false);
+        }
+        return { ...u, permissions: p };
+      });
+      if (syncDB && syncDB.users) {
+        try { syncDB.users(updated); } catch (e) { console.error('권한 저장 실패:', e); }
       }
-      // 현재 값 (기존 edit 권한과 호환)
-      let currentValue;
-      if (type === 'view') {
-        currentValue = p[menuId].view || false;
-      } else {
-        // create/update/delete - 새 권한이 있으면 그거, 없으면 기존 edit으로 폴백
-        currentValue = p[menuId][type] !== undefined ? p[menuId][type] : (p[menuId].edit || false);
-      }
-      p[menuId] = { ...p[menuId], [type]: !currentValue };
-      // 새 시스템에서는 edit는 create/update/delete의 OR 값으로 자동 계산
-      if (type !== 'view') {
-        p[menuId].edit = (p[menuId].create || false) || (p[menuId].update || false) || (p[menuId].delete || false);
-      }
-      return { ...u, permissions: p };
-    }));
+      return updated;
+    });
+    if (showToast) showToast('💾 권한 저장됨', '#15803d');
   };
   const setAllPerms = (uid, mode) => {
-    setUsers(prev => prev.map(u => {
+    setUsers(prev => {
+      const updated = prev.map(u => {
       if (u.id !== uid) return u;
       const newPerms = {};
       MENUS2.forEach(m => {
@@ -13391,7 +13645,13 @@ function UsersPage() {
         }
       });
       return { ...u, permissions: newPerms };
-    }));
+    });
+      if (syncDB && syncDB.users) {
+        try { syncDB.users(updated); } catch (e) { console.error('권한 저장 실패:', e); }
+      }
+      return updated;
+    });
+    if (showToast) showToast('💾 권한 저장됨', '#15803d');
     showToast('\u2705 \uAD8C\uD55C \uC77C\uAD04 \uC801\uC6A9!');
   };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -13773,15 +14033,13 @@ function ApprovalPage() {
   } = useAuth();
   const [comment, setComment] = useState('');
   const [commentId, setCommentId] = useState(null);
-  if (!['ceo', 'admin', 'vice'].includes(user?.role)) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: 40,
-        textAlign: 'center',
-        color: '#94a3b8'
-      }
-    }, "\u26D4 \uC2B9\uC778 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
-  }
+  // 직원은 본인 요청 건만 조회 가능 (승인/반려 불가)
+  const isApprover = ['ceo', 'admin', 'vice'].includes(user?.role);
+  // 직원은 본인 요청만 보이게 필터링
+  const visibleApprovals = useMemo(() => {
+    if (isApprover) return approvals || [];
+    return (approvals || []).filter(a => a && a.requester === user?.name);
+  }, [approvals, isApprover, user]);
   const typeLabel = {
     sales_add: '💰 매출 등록',
     sales_edit: '💰 매출 수정',
@@ -13795,7 +14053,7 @@ function ApprovalPage() {
     stock_out: '📤 재고 출고'
   };
   const approve = a => {
-    if (!canApprove()) {
+    if (!isApprover || !canApprove()) {
       showToast('승인 권한이 없습니다', '#dc2626');
       return;
     }
@@ -13831,7 +14089,7 @@ function ApprovalPage() {
     showToast('✅ 승인 완료! 데이터 반영됐습니다.', '#15803d');
   };
   const reject = a => {
-    if (!canApprove()) {
+    if (!isApprover || !canApprove()) {
       showToast('승인 권한이 없습니다', '#dc2626');
       return;
     }
@@ -13846,9 +14104,9 @@ function ApprovalPage() {
     setCommentId(null);
     showToast('🚫 반려됐습니다.', '#dc2626');
   };
-  const pending = approvals.filter(a => a.status === '대기');
-  const done = approvals.filter(a => a.status !== '대기').slice(0, 20);
-  const myPending = approvals.filter(a => a.requester === user.name && a.status === '대기');
+  const pending = visibleApprovals.filter(a => a.status === '대기');
+  const done = visibleApprovals.filter(a => a.status !== '대기').slice(0, 20);
+  const myPending = visibleApprovals.filter(a => a.requester === user.name && a.status === '대기');
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
