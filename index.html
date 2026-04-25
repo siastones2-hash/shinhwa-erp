@@ -3415,7 +3415,7 @@ function DashPage() {
     }
   }, won(s.total)), /*#__PURE__*/React.createElement(Tag, {
     c: s.collected ? 'green' : 'orange'
-  }, s.collected ? '수금' : '미수'))))))), ")}", user?.role === 'staff' && /*#__PURE__*/React.createElement("div", {
+  }, s.collected ? '수금' : '미수'))))))), user?.role === 'staff' && /*#__PURE__*/React.createElement("div", {
     style: {
       background: '#f8fafc',
       border: '1px solid #e2e8f0',
@@ -8715,14 +8715,6 @@ function CashbookPage() {
   } = useAuth();
   const todayStr = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState(todayStr);
-  // 권한 체크 - 대표/관리자/부대표만
-  if (!user || (user.role !== 'ceo' && user.role !== 'admin' && user.role !== 'vice')) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: { padding: 40, textAlign: 'center' }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 14, color: '#dc2626', fontWeight: 600 }
-    }, "🔒 자금일보는 대표/관리자/부대표만 접근 가능합니다"));
-  }
   // 데이터 안전 처리
   const safeReceipts = useMemo(() => {
     return (Array.isArray(receipts) ? receipts : []).filter(r => r && r.status !== '취소');
@@ -8889,6 +8881,15 @@ ${report.todayPayments.map(p => `<tr><td>${p.time||'-'}</td><td>${p.partner||'-'
       console.error(err);
     }
   };
+  // 권한 없으면 안내만
+  const hasPermission = user && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice');
+  if (!hasPermission) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { padding: 40, textAlign: 'center' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 14, color: '#dc2626', fontWeight: 600 }
+    }, "🔒 자금일보는 대표/관리자/부대표만 접근 가능합니다"));
+  }
   return /*#__PURE__*/React.createElement("div", null,
     // 헤더
     /*#__PURE__*/React.createElement("div", {
@@ -9030,14 +9031,6 @@ function ProfitLossPage() {
   } = useAuth();
   const todayStr = new Date().toISOString().slice(0, 10);
   const [selectedMonth, setSelectedMonth] = useState(todayStr.slice(0, 7));
-  // 권한 체크
-  if (!user || (user.role !== 'ceo' && user.role !== 'admin' && user.role !== 'vice')) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: { padding: 40, textAlign: 'center' }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 14, color: '#dc2626', fontWeight: 600 }
-    }, "🔒 손익계산서는 대표/관리자/부대표만 접근 가능합니다"));
-  }
   // 안전 데이터
   const safeSales = useMemo(() => (Array.isArray(sales) ? sales : []).filter(s => s && s.status !== '취소'), [sales]);
   const safePurchases = useMemo(() => (Array.isArray(purchases) ? purchases : []).filter(p => p && p.status !== '취소'), [purchases]);
@@ -9111,6 +9104,14 @@ function ProfitLossPage() {
     downloadCSV(rows, '손익계산서_' + selectedMonth);
     showToast('✅ 엑셀 다운로드!');
   };
+  const hasPermission = user && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice');
+  if (!hasPermission) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { padding: 40, textAlign: 'center' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 14, color: '#dc2626', fontWeight: 600 }
+    }, "🔒 손익계산서는 대표/관리자/부대표만 접근 가능합니다"));
+  }
   return /*#__PURE__*/React.createElement("div", null,
     // 헤더
     /*#__PURE__*/React.createElement("div", {
@@ -13615,8 +13616,8 @@ function UsersPage() {
       showToast('⚠️ 자기 자신의 역할을 직원으로 강등할 수 없습니다', '#dc2626');
       return;
     }
-    // 보호 2: 자기 자신을 비활성화 시도 방지
-    if (form.id === user.id && !form.active) {
+    // 보호 2: 자기 자신을 비활성화 시도 방지 (form.active가 명시적으로 false일 때만)
+    if (form.id === user.id && form.active === false) {
       showToast('⚠️ 자기 자신을 비활성화할 수 없습니다', '#dc2626');
       return;
     }
@@ -13631,7 +13632,7 @@ function UsersPage() {
         }
       }
       // 보호 4: 마지막 CEO를 비활성화 시도 방지
-      if (oldUser && oldUser.role === 'ceo' && !form.active && oldUser.active) {
+      if (oldUser && oldUser.role === 'ceo' && form.active === false && oldUser.active) {
         const activeCeoCount = users.filter(u => u.role === 'ceo' && u.active).length;
         if (activeCeoCount <= 1) {
           showToast('⚠️ 마지막 활성 대표 계정을 비활성화할 수 없습니다', '#dc2626');
@@ -13640,15 +13641,28 @@ function UsersPage() {
       }
     }
     if (form.id) {
+      // 수정: 기존 데이터에 form 덮어쓰기 (active 등 보존)
       setUsers(prev => prev.map(u => u.id === form.id ? {
-        ...form
+        ...u,
+        ...form,
+        active: form.active !== undefined ? form.active : (u.active !== undefined ? u.active : true)
       } : u));
+      const updated = users.find(u => u.id === form.id);
+      if (updated && syncDB.users) {
+        const newUser = { ...updated, ...form, active: form.active !== undefined ? form.active : (updated.active !== undefined ? updated.active : true) };
+        syncDB.users([newUser]);
+      }
       showToast('✅ 수정 완료!');
     } else {
-      setUsers(prev => [...prev, {
+      const newId = 'U' + Date.now();
+      const newUser = {
+        active: true,
+        permissions: {},
         ...form,
-        id: 'U' + Date.now()
-      }]);
+        id: newId
+      };
+      setUsers(prev => [...prev, newUser]);
+      if (syncDB.users) syncDB.users([newUser]);
       showToast('✅ 직원 추가!');
     }
     setModal(false);
