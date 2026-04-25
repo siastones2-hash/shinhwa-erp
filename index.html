@@ -1952,14 +1952,9 @@ function App() {
   const canView = menuId => {
     if (!user) return false;
     if (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') return true;
+    if (['report', 'approval', 'users'].includes(menuId)) return false;
     const p = user.permissions[menuId];
     return p ? p.view : false;
-  };
-  const canEdit = menuId => {
-    if (!user) return false;
-    if (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') return true;
-    const p = user.permissions[menuId];
-    return p ? p.edit : false;
   };
   const canApprove = () => user && (user.role === 'ceo' || user.role === 'vice');
   const isStaff = () => user && user.role === 'staff';
@@ -2500,7 +2495,7 @@ function DashPage() {
   const topBrands = Object.entries(brandSales).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const todayDate = todayStr();
   const todayExpected = receipts.filter(r => r.expectedDate === todayDate && r.status !== '취소').reduce((a, r) => a + Math.max(0, (r.billed || 0) - (r.received || 0)), 0);
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement("div", null, (user?.role === 'ceo' || user?.role === 'admin' || user?.role === 'vice') && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))',
@@ -2519,10 +2514,7 @@ function DashPage() {
   }, {
     label: '미수금 합계',
     value: won(unpaid),
-    sub: `${receipts.filter(r => Math.max(0, (r.billed || 0) - (r.received || 0)) > 0 && r.status !== '취소').length}건 미수 · 연체 ${receipts.filter(r => {
-      const d = r.expectedDate;
-      return d && new Date(d) < new Date() && Math.max(0, (r.billed || 0) - (r.received || 0)) > 0 && r.status !== '취소';
-    }).length}건`,
+    sub: `${receipts.filter(r => Math.max(0, (r.billed || 0) - (r.received || 0)) > 0 && r.status !== '취소').length}건 미수`,
     color: '#dc2626',
     bg: 'linear-gradient(135deg,#fef2f2,#fee2e2)',
     border: '#fca5a5',
@@ -2531,7 +2523,7 @@ function DashPage() {
   }, {
     label: '오늘 입금 예정',
     value: won(todayExpected),
-    sub: todayExpected > 0 ? '오늘 입금 예정' : '오늘 예정 없음',
+    sub: todayExpected > 0 ? '예정 있음' : '예정 없음',
     color: '#1d4ed8',
     bg: 'linear-gradient(135deg,#eff6ff,#dbeafe)',
     border: '#93c5fd',
@@ -2544,7 +2536,7 @@ function DashPage() {
       background: s.bg,
       border: `1.5px solid ${s.border}`,
       borderRadius: 14,
-      padding: '16px 18px',
+      padding: '14px 16px',
       cursor: 'pointer'
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -2567,366 +2559,7 @@ function DashPage() {
       color: '#94a3b8',
       marginTop: 4
     }
-  }, s.sub)))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 18,
-      fontWeight: 700
-    }
-  }, "\uB300\uC2DC\uBCF4\uB4DC"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: '#94a3b8'
-    }
-  }, todayStr(), " \xB7 ", user.name, "\uB2D8 \uD658\uC601\uD569\uB2C8\uB2E4 \uD83D\uDC4B")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => setPage('quote'),
-    color: "outline",
-    sm: true
-  }, "\uD83D\uDCCB \uACAC\uC801\uC11C \uC791\uC131"), /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => setPage('schedule'),
-    sm: true
-  }, "\uD83D\uDCC5 \uC2A4\uCF00\uC904"))), overdueReceipts2.length > 0 && /*#__PURE__*/React.createElement("div", {
-    onClick: () => setPage('receipt'),
-    style: {
-      background: '#fef2f2',
-      border: '2px solid #dc2626',
-      borderRadius: 10,
-      padding: '10px 14px',
-      marginBottom: 8,
-      cursor: 'pointer'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      marginBottom: 6
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 16
-    }
-  }, "\uD83D\uDEA8"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      color: '#dc2626',
-      fontSize: 13
-    }
-  }, "\uC5F0\uCCB4 \uBBF8\uC218\uAE08 ", overdueReceipts2.length, "\uAC74 \u2014 \uC989\uC2DC \uD655\uC778 \uD544\uC694!")), overdueReceipts2.slice(0, 3).map((r, i) => /*#__PURE__*/React.createElement("div", {
-    key: r.id,
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      fontSize: 11,
-      padding: '3px 0',
-      borderTop: i > 0 ? '1px solid #fee2e2' : 'none'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: '#475569',
-      fontWeight: 600
-    }
-  }, r.partner), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      color: r.dday > 14 ? '#dc2626' : r.dday > 7 ? '#ea580c' : '#ca8a04'
-    }
-  }, "D+", r.dday, "\uC77C \uC5F0\uCCB4 \xB7 ", won(Math.max(0, (r.billed || 0) - (r.received || 0)))))), overdueReceipts2.length > 3 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: '#94a3b8',
-      marginTop: 4
-    }
-  }, "\uC678 ", overdueReceipts2.length - 3, "\uAC74 \uB354...")), overdueReceipts.length > 0 && /*#__PURE__*/React.createElement("div", {
-    onClick: () => setPage('receipt'),
-    style: {
-      background: '#fef2f2',
-      border: '1.5px solid #fecaca',
-      borderRadius: 10,
-      padding: '10px 14px',
-      marginBottom: 8,
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "\uD83D\uDEA8"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      color: '#dc2626',
-      fontSize: 13
-    }
-  }, "\uBBF8\uC218\uAE08 30\uC77C \uCD08\uACFC ", overdueReceipts.length, "\uAC74"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: '#94a3b8'
-    }
-  }, overdueReceipts.map(r => r.partner).slice(0, 3).join(','), " \u2014 \uCD1D ", won(overdueReceipts.reduce((a, r) => a + Math.max(0, (r.billed || 0) - (r.received || 0)), 0)))), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: '#dc2626',
-      fontSize: 12,
-      fontWeight: 600
-    }
-  }, "\uD655\uC778 \u2192")), zeroStock.length > 0 && /*#__PURE__*/React.createElement("div", {
-    onClick: () => setPage('stock'),
-    style: {
-      background: '#fef2f2',
-      border: '1.5px solid #fecaca',
-      borderRadius: 10,
-      padding: '10px 14px',
-      marginBottom: 8,
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "\u274C"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      color: '#dc2626',
-      fontSize: 13
-    }
-  }, "\uC7AC\uACE0 \uC18C\uC9C4 ", zeroStock.length, "\uAC1C"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: '#94a3b8'
-    }
-  }, zeroStock.map(p => p.ko).slice(0, 3).join(','), zeroStock.length > 3 ? ` 외 ${zeroStock.length - 3}개` : '')), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: '#dc2626',
-      fontSize: 12,
-      fontWeight: 600
-    }
-  }, "\uC785\uACE0 \u2192")), urgentSchedules.length > 0 && /*#__PURE__*/React.createElement("div", {
-    onClick: () => setPage('schedule'),
-    style: {
-      background: '#fff7ed',
-      border: '1.5px solid #fed7aa',
-      borderRadius: 10,
-      padding: '10px 14px',
-      marginBottom: 8,
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "\u23F0"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      color: '#ea580c',
-      fontSize: 13
-    }
-  }, "D-3 \uC774\uB0B4 \uC77C\uC815 ", urgentSchedules.length, "\uAC74"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: '#94a3b8'
-    }
-  }, urgentSchedules.map(s => s.title).slice(0, 3).join(' · '))), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: '#ea580c',
-      fontSize: 12,
-      fontWeight: 600
-    }
-  }, "\uD655\uC778 \u2192")), pendingQuotes.length > 0 && /*#__PURE__*/React.createElement("div", {
-    onClick: () => setPage('quote'),
-    style: {
-      background: '#f5f3ff',
-      border: '1.5px solid #ddd6fe',
-      borderRadius: 10,
-      padding: '10px 14px',
-      marginBottom: 8,
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "\uD83D\uDCCB"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      color: '#7c3aed',
-      fontSize: 13
-    }
-  }, "\uBBF8\uD655\uC815 \uACAC\uC801\uC11C ", pendingQuotes.length, "\uAC74 (7\uC77C\u2191)"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: '#94a3b8'
-    }
-  }, pendingQuotes.map(q => q.receiver).slice(0, 3).join(','))), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: '#7c3aed',
-      fontSize: 12,
-      fontWeight: 600
-    }
-  }, "\uD655\uC778 \u2192")), todaySchedules.length > 0 && /*#__PURE__*/React.createElement("div", {
-    onClick: () => setPage('schedule'),
-    style: {
-      background: '#eff6ff',
-      border: '1.5px solid #bfdbfe',
-      borderRadius: 10,
-      padding: '10px 14px',
-      marginBottom: 8,
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "\uD83D\uDCC5"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      color: '#1d4ed8',
-      fontSize: 13
-    }
-  }, "\uC624\uB298 \uC77C\uC815 ", todaySchedules.length, "\uAC74"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: '#94a3b8'
-    }
-  }, todaySchedules.map(s => s.title).join(' · ')))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(3,1fr)',
-      gap: 10,
-      marginBottom: 14
-    }
-  }, [{
-    label: '이번달 매출',
-    value: won(mSales),
-    icon: '💰',
-    bg: '#f0fdf4',
-    tc: '#15803d',
-    page: 'sales',
-    pct: pct(mSales, lmSales)
-  }, {
-    label: '이번달 매입',
-    value: won(mPurchase),
-    icon: '🛒',
-    bg: '#fff7ed',
-    tc: '#ea580c',
-    page: 'purchase',
-    pct: null
-  }, {
-    label: '이번달 순이익',
-    value: won(mProfit),
-    icon: mProfit >= 0 ? '📈' : '📉',
-    bg: mProfit >= 0 ? '#f0fdf4' : '#fef2f2',
-    tc: mProfit >= 0 ? '#15803d' : '#dc2626',
-    page: 'report',
-    pct: pct(mProfit, lmProfit)
-  }, {
-    label: '재고자산',
-    value: won(stockAsset),
-    icon: '🏭',
-    bg: '#eff6ff',
-    tc: '#1d4ed8',
-    page: 'stock',
-    pct: null
-  }, {
-    label: '미수금',
-    value: won(unpaid),
-    icon: '⚠️',
-    bg: '#fef2f2',
-    tc: '#dc2626',
-    page: 'receipt',
-    pct: null
-  }, {
-    label: '미지급',
-    value: won(unpay),
-    icon: '💸',
-    bg: '#f5f3ff',
-    tc: '#7c3aed',
-    page: 'payment',
-    pct: null
-  }].map((s, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    onClick: () => setPage(s.page),
-    style: {
-      background: s.bg,
-      border: '1px solid #e2e8f0',
-      borderRadius: 12,
-      padding: 14,
-      cursor: 'pointer'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: '#64748b',
-      fontWeight: 600
-    }
-  }, s.label), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, s.icon)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 18,
-      fontWeight: 800,
-      color: s.tc,
-      fontFamily: 'monospace',
-      marginBottom: 3
-    }
-  }, s.value), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: '#94a3b8',
-      display: 'flex',
-      alignItems: 'center'
-    }
-  }, "\uC804\uC6D4 \uB300\uBE44", /*#__PURE__*/React.createElement(Arrow, {
-    val: s.pct
-  }))))), /*#__PURE__*/React.createElement("div", {
+  }, s.sub)))), (user?.role === 'ceo' || user?.role === 'admin' || user?.role === 'vice') && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
@@ -3259,7 +2892,52 @@ function DashPage() {
     }
   }, won(s.total)), /*#__PURE__*/React.createElement(Tag, {
     c: s.collected ? 'green' : 'orange'
-  }, s.collected ? '수금' : '미수'))))))));
+  }, s.collected ? '수금' : '미수'))))))), ")}", user?.role === 'staff' && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: '#f8fafc',
+      border: '1px solid #e2e8f0',
+      borderRadius: 12,
+      padding: 32,
+      textAlign: 'center',
+      color: '#64748b',
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 32,
+      marginBottom: 12
+    }
+  }, "\uD83D\uDCCB"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 16,
+      marginBottom: 8,
+      color: '#0f172a'
+    }
+  }, "\uC548\uB155\uD558\uC138\uC694, ", user?.name, "\uB2D8! \uD83D\uDC4B"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      marginBottom: 16
+    }
+  }, "\uC67C\uCABD \uBA54\uB274\uC5D0\uC11C \uC5C5\uBB34\uB97C \uC2DC\uC791\uD558\uC138\uC694."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      justifyContent: 'center',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setPage('sales'),
+    color: "outline",
+    sm: true
+  }, "\uD83D\uDCB0 \uB9E4\uCD9C \uB4F1\uB85D"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setPage('quote'),
+    color: "outline",
+    sm: true
+  }, "\uD83D\uDCCB \uACAC\uC801\uC11C \uC791\uC131"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setPage('schedule'),
+    sm: true
+  }, "\uD83D\uDCC5 \uC77C\uC815 \uD655\uC778"))));
 }
 function ProductsPage() {
   const {
