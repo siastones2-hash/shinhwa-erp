@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1509 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1541 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -586,7 +586,7 @@ const INIT_USERS = [{
   name: '이민수',
   email: 'leeminsoo',
   password: '1234',
-  role: 'vice',
+  role: 'admin',
   permissions: {},
   active: true,
   phone: '',
@@ -2041,11 +2041,20 @@ function App() {
   const syncDB = {
     users: async data => {
       try {
-        await sb.replace('erp_users', data.map(u => ({
-          id: u.id, name: u.name, email: u.email, password: u.password,
-          role: u.role, permissions: u.permissions || {}, active: u.active !== false,
-          phone: u.phone || '', dept: u.dept || ''
-        })));
+        // role 검증: Supabase에 등록된 값만 허용 (vice는 admin으로 변환)
+        const validRoles = ['ceo', 'admin', 'staff'];
+        const cleaned = data.map(u => ({
+          id: u.id || ('u' + Date.now()),
+          name: u.name || '',
+          email: u.email || '',
+          password: u.password || '1234',
+          role: validRoles.includes(u.role) ? u.role : (u.role === 'vice' ? 'admin' : 'staff'),
+          permissions: u.permissions || {},
+          active: u.active !== false,
+          phone: u.phone || '',
+          dept: u.dept || ''
+        }));
+        await sb.replace('erp_users', cleaned);
       } catch (e) {
         console.error('sync users:', e);
       }
@@ -2214,59 +2223,70 @@ function App() {
     if (!user) return false;
     // 대표는 무조건 모든 권한
     if (user.role === 'ceo') return true;
-    // 관리자/부대표는 직원관리/결재함/리포트 자동 허용
-    if ((user.role === 'admin' || user.role === 'vice') && ['report', 'approval', 'users'].includes(menuId)) return true;
+    // 관리자/전무는 모든 권한 자동 (대표가 명시적으로 false 설정한 경우만 차단)
+    if (user.role === 'admin' || user.role === 'vice') {
+      const p = user.permissions ? user.permissions[menuId] : null;
+      // 명시적으로 view: false 인 경우만 차단, 그 외는 모두 허용
+      if (p && p.view === false) return false;
+      return true;
+    }
     // 직원은 직원관리/결재함/리포트 차단
-    if (user.role === 'staff' && ['report', 'approval', 'users'].includes(menuId)) return false;
-    // 권한이 명시적으로 설정되어 있으면 그걸 따름
+    if (['report', 'approval', 'users'].includes(menuId)) return false;
+    // 직원은 권한 부여받은 만큼만
     const p = user.permissions ? user.permissions[menuId] : null;
-    if (p && p.view !== undefined) return p.view;
-    // 권한이 없으면: 관리자/부대표는 자동 허용, 직원은 차단
-    return user.role === 'admin' || user.role === 'vice';
+    return p ? !!p.view : false;
   };
   const canEdit = menuId => {
     if (!user) return false;
     if (user.role === 'ceo') return true;
-    if ((user.role === 'admin' || user.role === 'vice') && ['report', 'approval', 'users'].includes(menuId)) return true;
-    if (user.role === 'staff' && ['report', 'approval', 'users'].includes(menuId)) return false;
-    const p = user.permissions ? user.permissions[menuId] : null;
-    if (p && (p.edit !== undefined || p.create !== undefined || p.update !== undefined || p.delete !== undefined)) {
-      return p.edit || p.create || p.update || p.delete || false;
+    if (user.role === 'admin' || user.role === 'vice') {
+      const p = user.permissions ? user.permissions[menuId] : null;
+      if (p && p.edit === false && p.create === false && p.update === false && p.delete === false) return false;
+      return true;
     }
-    return user.role === 'admin' || user.role === 'vice';
+    if (['report', 'approval', 'users'].includes(menuId)) return false;
+    const p = user.permissions ? user.permissions[menuId] : null;
+    if (!p) return false;
+    return p.edit || p.create || p.update || p.delete || false;
   };
   const canCreate = menuId => {
     if (!user) return false;
     if (user.role === 'ceo') return true;
-    if ((user.role === 'admin' || user.role === 'vice') && ['report', 'approval', 'users'].includes(menuId)) return true;
-    if (user.role === 'staff' && ['report', 'approval', 'users'].includes(menuId)) return false;
-    const p = user.permissions ? user.permissions[menuId] : null;
-    if (p && (p.create !== undefined || p.edit !== undefined)) {
-      return p.create !== undefined ? p.create : (p.edit || false);
+    if (user.role === 'admin' || user.role === 'vice') {
+      const p = user.permissions ? user.permissions[menuId] : null;
+      if (p && p.create === false) return false;
+      return true;
     }
-    return user.role === 'admin' || user.role === 'vice';
+    if (['report', 'approval', 'users'].includes(menuId)) return false;
+    const p = user.permissions ? user.permissions[menuId] : null;
+    if (!p) return false;
+    return p.create !== undefined ? p.create : (p.edit || false);
   };
   const canUpdate = menuId => {
     if (!user) return false;
     if (user.role === 'ceo') return true;
-    if ((user.role === 'admin' || user.role === 'vice') && ['report', 'approval', 'users'].includes(menuId)) return true;
-    if (user.role === 'staff' && ['report', 'approval', 'users'].includes(menuId)) return false;
-    const p = user.permissions ? user.permissions[menuId] : null;
-    if (p && (p.update !== undefined || p.edit !== undefined)) {
-      return p.update !== undefined ? p.update : (p.edit || false);
+    if (user.role === 'admin' || user.role === 'vice') {
+      const p = user.permissions ? user.permissions[menuId] : null;
+      if (p && p.update === false) return false;
+      return true;
     }
-    return user.role === 'admin' || user.role === 'vice';
+    if (['report', 'approval', 'users'].includes(menuId)) return false;
+    const p = user.permissions ? user.permissions[menuId] : null;
+    if (!p) return false;
+    return p.update !== undefined ? p.update : (p.edit || false);
   };
   const canDelete = menuId => {
     if (!user) return false;
     if (user.role === 'ceo') return true;
-    if ((user.role === 'admin' || user.role === 'vice') && ['report', 'approval', 'users'].includes(menuId)) return true;
-    if (user.role === 'staff' && ['report', 'approval', 'users'].includes(menuId)) return false;
-    const p = user.permissions ? user.permissions[menuId] : null;
-    if (p && (p.delete !== undefined || p.edit !== undefined)) {
-      return p.delete !== undefined ? p.delete : (p.edit || false);
+    if (user.role === 'admin' || user.role === 'vice') {
+      const p = user.permissions ? user.permissions[menuId] : null;
+      if (p && p.delete === false) return false;
+      return true;
     }
-    return user.role === 'admin' || user.role === 'vice';
+    if (['report', 'approval', 'users'].includes(menuId)) return false;
+    const p = user.permissions ? user.permissions[menuId] : null;
+    if (!p) return false;
+    return p.delete !== undefined ? p.delete : (p.edit || false);
   };
   const canApprove = () => user && (user.role === 'ceo' || user.role === 'vice' || user.role === 'admin');
   const isStaff = () => user && user.role === 'staff';
@@ -2629,7 +2649,15 @@ function App() {
       padding: 20,
       minWidth: 0
     }
-  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CbmPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), !['dash','products','stock','sales','purchase','receipt','payment','tax','quote','buyers','buyer_detail','cashbook','profitloss','approval','pricelist','report','schedule','cbm','invoice','bizreport','annex','users','mypage'].includes(page) && /*#__PURE__*/React.createElement("div", {
+  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CbmPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), 
+    // 권한 차단 안내 (페이지는 매칭되는데 canView가 false인 경우)
+    ['products','stock','sales','purchase','receipt','payment','tax','quote','buyers','pricelist','schedule','invoice'].includes(page) && !canView(page) && /*#__PURE__*/React.createElement("div", {
+      style: { padding: 40, textAlign: 'center' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 16, color: '#dc2626', fontWeight: 700, marginBottom: 8 }
+    }, "🔒 이 메뉴를 볼 권한이 없습니다"), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 12, color: '#94a3b8' }
+    }, "대표에게 권한을 요청하세요")), !['dash','products','stock','sales','purchase','receipt','payment','tax','quote','buyers','buyer_detail','cashbook','profitloss','approval','pricelist','report','schedule','cbm','invoice','bizreport','annex','users','mypage'].includes(page) && /*#__PURE__*/React.createElement("div", {
     style: { padding: 40, textAlign: 'center', color: '#94a3b8' }
   }, "\uD398\uC774\uC9C0\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uB300\uC2DC\uBCF4\uB4DC\uB85C \uB3CC\uC544\uAC00\uC138\uC694."))), /*#__PURE__*/React.createElement("div", {
     className: "mobile-bottom-nav",
@@ -2728,7 +2756,7 @@ function DashPage() {
     setSelectedBuyer,
     showToast
   } = useAuth();
-  // 마지막 백업 날짜 체크 (대표/관리자/부대표만 알림 표시)
+  // 마지막 백업 날짜 체크 (대표/관리자/전무만 알림 표시)
   const lastBackup = LS.get('last_backup_date', null);
   const daysSinceBackup = useMemo(() => {
     if (!lastBackup) return 999; // 한 번도 백업 안 한 경우
@@ -8935,7 +8963,7 @@ ${report.todayPayments.map(p => `<tr><td>${p.time||'-'}</td><td>${p.partner||'-'
       style: { padding: 40, textAlign: 'center' }
     }, /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 14, color: '#dc2626', fontWeight: 600 }
-    }, "🔒 자금일보는 대표/관리자/부대표만 접근 가능합니다"));
+    }, "🔒 자금일보는 대표/관리자/전무만 접근 가능합니다"));
   }
   return /*#__PURE__*/React.createElement("div", null,
     // 헤더
@@ -9157,7 +9185,7 @@ function ProfitLossPage() {
       style: { padding: 40, textAlign: 'center' }
     }, /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 14, color: '#dc2626', fontWeight: 600 }
-    }, "🔒 손익계산서는 대표/관리자/부대표만 접근 가능합니다"));
+    }, "🔒 손익계산서는 대표/관리자/전무만 접근 가능합니다"));
   }
   return /*#__PURE__*/React.createElement("div", null,
     // 헤더
@@ -13847,8 +13875,8 @@ function UsersPage() {
       color: '#94a3b8'
     }
   }, "@", u.email, " ", u.phone && '· ' + u.phone)), /*#__PURE__*/React.createElement(Tag, {
-    c: u.role === 'ceo' ? 'red' : u.role === 'admin' ? 'purple' : 'blue'
-  }, u.role === 'ceo' ? '👑 대표' : u.role === 'admin' ? '🛠️ 관리자' : '👤 직원'), /*#__PURE__*/React.createElement(Tag, {
+    c: u.role === 'ceo' ? 'red' : u.role === 'admin' ? 'purple' : u.role === 'vice' ? 'orange' : 'blue'
+  }, u.role === 'ceo' ? '👑 대표' : u.role === 'admin' ? '🛠️ 관리자' : u.role === 'vice' ? '⭐ 전무' : '👤 직원'), /*#__PURE__*/React.createElement(Tag, {
     c: u.active ? 'green' : 'gray'
   }, u.active ? '활성' : '비활성'), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
@@ -13904,7 +13932,7 @@ function UsersPage() {
       border: '1px solid #fde68a',
       lineHeight: 1.6
     }
-  }, "💡 ", /*#__PURE__*/React.createElement("strong", null, "조회"), "를 끄면 해당 메뉴 자체가 사이드바에서 숨겨져요. ", /*#__PURE__*/React.createElement("strong", null, "등록/수정/삭제"), "는 페이지 안에서 작업할 수 있는 권한이에요. ", /*#__PURE__*/React.createElement("br", null), "📌 ", /*#__PURE__*/React.createElement("strong", null, "관리자/부대표"), "는 권한 미설정 시 모든 권한 자동 부여됩니다. 제한하려면 직접 체크박스로 설정하세요."), /*#__PURE__*/React.createElement("div", {
+  }, "💡 ", /*#__PURE__*/React.createElement("strong", null, "조회"), "를 끄면 해당 메뉴 자체가 사이드바에서 숨겨져요. ", /*#__PURE__*/React.createElement("strong", null, "등록/수정/삭제"), "는 페이지 안에서 작업할 수 있는 권한이에요. ", /*#__PURE__*/React.createElement("br", null), "📌 ", /*#__PURE__*/React.createElement("strong", null, "관리자/전무"), "는 권한 미설정 시 모든 권한 자동 부여됩니다. 제한하려면 직접 체크박스로 설정하세요."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 6,
@@ -14102,9 +14130,7 @@ function UsersPage() {
     value: "staff"
   }, "\uC9C1\uC6D0"), /*#__PURE__*/React.createElement("option", {
     value: "admin"
-  }, "\uAD00\uB9AC\uC790"), /*#__PURE__*/React.createElement("option", {
-    value: "vice"
-  }, "\uC804\uBB34"))), /*#__PURE__*/React.createElement(FG, {
+  }, "\uAD00\uB9AC\uC790"))), /*#__PURE__*/React.createElement(FG, {
     label: "\uC0C1\uD0DC"
   }, /*#__PURE__*/React.createElement(Sel, {
     value: form.active ? 'active' : 'inactive',
