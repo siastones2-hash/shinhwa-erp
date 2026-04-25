@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1818 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1835 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -10208,6 +10208,28 @@ function BuyersPage() {
     onClick: downloadBuyerTemplate,
     color: "outline",
     sm: true
+  }, "📋 템플릿"), editable && /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 4,
+      padding: '8px 12px',
+      background: '#15803d',
+      color: '#fff',
+      borderRadius: 6,
+      cursor: 'pointer',
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "📤 엑셀 업로드", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".xlsx,.xls,.csv",
+    onChange: handleBuyerImport,
+    style: { display: 'none' }
+  })), editable && /*#__PURE__*/React.createElement(Btn, {
+    onClick: downloadBuyerTemplate,
+    color: "outline",
+    sm: true
   }, "📋 템플릿"), editable && /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       setForm({
@@ -10537,7 +10559,42 @@ function BuyersPage() {
     color: "outline"
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save
-  }, "\u2705 \uC800\uC7A5"))));
+  }, "\u2705 \uC800\uC7A5")))), importModal && /*#__PURE__*/React.createElement(Modal, {
+    title: '📤 거래처 일괄 등록 - 미리보기',
+    onClose: () => { setImportModal(false); setImportPreview([]); }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12, padding: 12, background: '#eff6ff', borderRadius: 8, border: '1px solid #93c5fd' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 4 }
+  }, "✅ ", importPreview.length, "건의 거래처를 인식했습니다"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, color: '#64748b' }
+  }, "기존 거래처와 중복되는 건 자동 제외됩니다.")), /*#__PURE__*/React.createElement("div", {
+    style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
+  }, /*#__PURE__*/React.createElement("thead", {
+    style: { position: 'sticky', top: 0, background: '#f8fafc' }
+  }, /*#__PURE__*/React.createElement("tr", null, ['거래처명', '국가', '구분', '담당자', '이메일'].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, importPreview.slice(0, 50).map((b, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i,
+    style: { borderBottom: '1px solid #f1f5f9' }
+  }, /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, b.name),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, b.country),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, b.type),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, b.contact || '-'),
+     /*#__PURE__*/React.createElement("td", { style: { padding: 6, color: '#64748b' } }, b.email || '-'))))), importPreview.length > 50 && /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: 'center', color: '#94a3b8', fontSize: 11, marginBottom: 8 }
+  }, "(50건만 미리보기 - 실제로는 ", importPreview.length, "건 모두 등록됩니다)"), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, flexWrap: 'wrap' }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => { setImportModal(false); setImportPreview([]); },
+    color: 'outline'
+  }, "취소"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => confirmBuyerImport('append'),
+    color: 'blue'
+  }, "➕ 기존에 추가 (중복 자동 제외)"))));
 }
 function PriceListPage() {
   const {
