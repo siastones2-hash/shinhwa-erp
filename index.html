@@ -6304,7 +6304,9 @@ function PurchasePage() {
     note: ''
   });
   const editable = canEdit('purchase');
+  const [showCanceledP, setShowCanceledP] = useState(false);
   const filtered = purchases.filter(s => {
+    if (!showCanceledP && s.status === '취소') return false;
     if (searchText && !(s.partner || '').includes(searchText)) return false;
     if (itemSearch && !(s.item || '').toLowerCase().includes(itemSearch.toLowerCase())) return false;
     if (dateFrom && s.date < dateFrom) return false;
@@ -6417,22 +6419,38 @@ function PurchasePage() {
       alignItems: 'center',
       marginBottom: 12
     }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12
+    }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 16,
       fontWeight: 700
     }
-  }, "\uD83D\uDED2 \uB9E4\uC785\uAD00\uB9AC"), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDED2 \uB9E4\uC785\uAD00\uB9AC"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: '#94a3b8',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 2
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: showCanceledP,
+    onChange: e => setShowCanceledP(e.target.checked)
+  }), "\uCDE8\uC18C\uAC74 \uD3EC\uD568"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: '#94a3b8'
     }
-  }, "\uC804\uCCB4 ", purchases.length, "\uAC74 \xB7 \uC870\uD68C ", filtered.length, "\uAC74")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement(Btn, {
+  }, "\uC804\uCCB4 ", purchases.length, "\uAC74 \xB7 \uC870\uD68C ", filtered.length, "\uAC74")), /*#__PURE__*/React.createElement(Btn, {
     onClick: exportExcel,
     color: "outline",
     sm: true
@@ -6791,6 +6809,8 @@ function ReceiptPage() {
   const {
     receipts,
     setReceipts,
+    sales,
+    setSales,
     showToast,
     canEdit,
     syncDB,
@@ -6871,11 +6891,21 @@ function ReceiptPage() {
     }
     setReceipts(prev => [...prev, entry]);
     syncDB.receipt(entry);
+    // 수금 완료 시 매출 collected 자동 업데이트
+    const totalBil = +form.billed || 0;
+    const totalRec = +form.received || 0;
+    if (totalRec >= totalBil && totalBil > 0 && setSales) {
+      setSales(prev => prev.map(s => s.partner === form.partner && !s.collected ? {
+        ...s,
+        collected: true
+      } : s));
+    }
     setModal(false);
     showToast('✅ 수금 등록!');
   };
+  const [showCanceledR, setShowCanceledR] = useState(false);
   const filteredRec = receipts.filter(r => {
-    if (r.status === '취소') return false;
+    if (!showCanceledR && r.status === '취소') return false;
     if (partnerFilter && !(r.partner || '').includes(partnerFilter)) return false;
     if (dateFrom && (r.date || '') < dateFrom) return false;
     if (dateTo && (r.date || '') > dateTo) return false;
@@ -6895,7 +6925,21 @@ function ReceiptPage() {
       fontSize: 16,
       fontWeight: 700
     }
-  }, "\uD83D\uDCB5 \uC218\uAE08\uAD00\uB9AC")), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCB5 \uC218\uAE08\uAD00\uB9AC"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: '#94a3b8',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 2
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: showCanceledR,
+    onChange: e => setShowCanceledR(e.target.checked)
+  }), "\uCDE8\uC18C\uAC74 \uD3EC\uD568")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8
@@ -7247,8 +7291,9 @@ function PaymentPage() {
     setModal(false);
     showToast('✅ 지급 등록!');
   };
+  const [showCanceledPy, setShowCanceledPy] = useState(false);
   const filteredPay = payments.filter(r => {
-    if (r.status === '취소') return false;
+    if (!showCanceledPy && r.status === '취소') return false;
     if (partnerFilter && !(r.partner || '').includes(partnerFilter)) return false;
     if (dateFrom && (r.date || '') < dateFrom) return false;
     if (dateTo && (r.date || '') > dateTo) return false;
@@ -7268,7 +7313,21 @@ function PaymentPage() {
       fontSize: 16,
       fontWeight: 700
     }
-  }, "\uD83D\uDCB8 \uC9C0\uAE09\uAD00\uB9AC")), editable && /*#__PURE__*/React.createElement(Btn, {
+  }, "\uD83D\uDCB8 \uC9C0\uAE09\uAD00\uB9AC"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: '#94a3b8',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 2
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: showCanceledPy,
+    onChange: e => setShowCanceledPy(e.target.checked)
+  }), "\uCDE8\uC18C\uAC74 \uD3EC\uD568")), editable && /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       setForm({
         date: todayStr(),
@@ -7563,6 +7622,7 @@ function TaxPage() {
   } = useAuth();
   const [modal, setModal] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [showCanceledT, setShowCanceledT] = useState(false);
   const [form, setForm] = useState({
     date: todayStr(),
     buyer: '',
@@ -7625,7 +7685,21 @@ function TaxPage() {
       fontSize: 16,
       fontWeight: 700
     }
-  }, "\uD83E\uDDFE \uC138\uAE08\uACC4\uC0B0\uC11C"), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83E\uDDFE \uC138\uAE08\uACC4\uC0B0\uC11C"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: '#94a3b8',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 2
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: showCanceledT,
+    onChange: e => setShowCanceledT(e.target.checked)
+  }), "\uCDE8\uC18C\uAC74 \uD3EC\uD568"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: '#94a3b8'
@@ -7651,7 +7725,7 @@ function TaxPage() {
   }, "\u271A \uBC1C\uD589")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
     heads: ['발행일', '문서번호', '공급받는자', '사업자번호', '품목', '공급가액', '세액', '합계', '유형', editable ? '' : ''].filter(Boolean),
     empty: "\uC138\uAE08\uACC4\uC0B0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
-    rows: [...taxInvoices].reverse().map((t, i) => /*#__PURE__*/React.createElement("tr", {
+    rows: [...taxInvoices].filter(t => showCanceledT || t.status !== '취소').reverse().map((t, i) => /*#__PURE__*/React.createElement("tr", {
       key: t.id,
       style: {
         background: i % 2 ? '#fafbff' : '#fff'
@@ -9748,7 +9822,8 @@ function QuotePage() {
     canEdit,
     user,
     getStock,
-    syncDB
+    syncDB,
+    requestApproval
   } = useAuth();
   const [tab, setTab] = useState('list');
   const [form, setForm] = useState({
@@ -9777,7 +9852,8 @@ function QuotePage() {
     });else if (prodSort === 'stock_desc') list = [...list].sort((a, b) => getStock(b.id) - getStock(a.id));
     return list;
   })();
-  const filteredQuotes = buyerFilter ? quotes.filter(q => q.receiver === buyerFilter) : quotes;
+  const [showCanceledQ, setShowCanceledQ] = useState(false);
+  const filteredQuotes = (buyerFilter ? quotes.filter(q => q.receiver === buyerFilter) : quotes).filter(q => showCanceledQ || q.status !== '취소');
   const copyQuote = q => {
     setForm({
       type: q.type.includes('국내') ? 'ko' : 'en',
@@ -9917,6 +9993,23 @@ function QuotePage() {
       createdBy: user.name
     };
     setQuotes(prev => [q, ...prev]);
+    if (user.role === 'staff') {
+      requestApproval('quote_add', '견적서: ' + no + ' / ' + form.to, q, user.name);
+      setTab('list');
+      setForm({
+        type: 'ko',
+        to: '',
+        buyerId: '',
+        country: '한국',
+        pay: '현금',
+        date: todayStr(),
+        validDays: '30',
+        note: '',
+        items: []
+      });
+      showToast('📨 승인 요청 완료!', '#7c3aed');
+      return;
+    }
     syncDB.quote(q);
     showToast('✅ 견적서 저장!');
     setTab('list');
@@ -9984,15 +10077,29 @@ function QuotePage() {
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: 700
     }
   }, "\uD83D\uDCCB \uACAC\uC801\uC11C/PI"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
-      color: '#94a3b8'
+      color: '#94a3b8',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8
     }
-  }, quotes.length, "\uAC74")), tab === 'list' && editable && /*#__PURE__*/React.createElement("div", {
+  }, filteredQuotes.length, "\uAC74 ", /*#__PURE__*/React.createElement("label", {
+    style: {
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: showCanceledQ,
+    onChange: e => setShowCanceledQ(e.target.checked)
+  }), "\uCDE8\uC18C\uAC74 \uD3EC\uD568"))), tab === 'list' && editable && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8
@@ -10317,7 +10424,15 @@ function QuotePage() {
       resize: 'vertical'
     },
     placeholder: "\uD2B9\uC774\uC0AC\uD56D"
-  })))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(CardHead, {
+  })))), /*#__PURE__*/React.createElement(Card, null, form.items.some(i => (i.unitPrice || 0) === 0) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: '#fffbeb',
+      border: '1px solid #fcd34d',
+      padding: '6px 14px',
+      fontSize: 11,
+      color: '#92400e'
+    }
+  }, "\u26A0\uFE0F \uB2E8\uAC00 \u20A90 \uD56D\uBAA9 \uC788\uC74C \u2014 \uC9C1\uC811 \uC785\uB825\uD574\uC8FC\uC138\uC694"), /*#__PURE__*/React.createElement(CardHead, {
     left: `선택된 상품 (${form.items.length}개)`,
     right: /*#__PURE__*/React.createElement("span", {
       style: {
@@ -10389,16 +10504,19 @@ function QuotePage() {
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
-      color: '#94a3b8',
+      color: (i.unitPrice || 0) === 0 ? '#dc2626' : '#94a3b8',
+      fontWeight: (i.unitPrice || 0) === 0 ? 700 : 400,
       marginBottom: 2
     }
-  }, "\uB2E8\uAC00"), /*#__PURE__*/React.createElement("input", {
+  }, (i.unitPrice || 0) === 0 ? '⚠️ 단가입력' : '단가'), /*#__PURE__*/React.createElement("input", {
     type: "number",
     value: i.unitPrice,
     onChange: e => updateItem(i.productId, 'unitPrice', e.target.value),
     style: {
       ...inp2style,
-      textAlign: 'right'
+      textAlign: 'right',
+      borderColor: (i.unitPrice || 0) === 0 ? '#fca5a5' : '#e2e8f0',
+      background: (i.unitPrice || 0) === 0 ? '#fff5f5' : '#fff'
     }
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -10534,14 +10652,20 @@ function QuotePage() {
         textAlign: 'right',
         flexShrink: 0
       }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, (p.sale || p.consumer || 0) > 0 ? /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         fontFamily: 'monospace',
         color: '#15803d',
         fontWeight: 600
       }
-    }, won(p.sale || p.consumer)), /*#__PURE__*/React.createElement("div", {
+    }, won(p.sale || p.consumer)) : /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: '#f59e0b',
+        fontWeight: 700
+      }
+    }, "\u26A0\uFE0F \uB2E8\uAC00\uC5C6\uC74C"), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10,
         color: stock > 0 ? '#94a3b8' : '#dc2626'
@@ -10747,7 +10871,7 @@ function InvoicePage() {
     color: "outline"
   }, "\u2190 \uBAA9\uB85D")), tab === 'list' && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
     heads: ['No.', '유형', '날짜', '수입자', '금액', ''],
-    rows: invoices.map((inv, i) => /*#__PURE__*/React.createElement("tr", {
+    rows: invoices.filter(x => x.status !== '취소').map((inv, i) => /*#__PURE__*/React.createElement("tr", {
       key: inv.id,
       style: {
         background: i % 2 ? '#fafbff' : '#fff'
@@ -10786,13 +10910,18 @@ function InvoicePage() {
       sm: true
     }, "\uD83D\uDCC4 PDF"), /*#__PURE__*/React.createElement(Btn, {
       onClick: () => {
-        if (!confirmDel('인보이스를 삭제하시겠습니까?')) return;
-        setInvoices(p => p.filter(x => x.id !== inv.id));
-        syncDB.delInvoice(inv.id);
+        if (!window.confirm('인보이스를 취소 처리하시겠습니까?')) return;
+        const upd = {
+          ...inv,
+          status: '취소',
+          canceledAt: todayStr()
+        };
+        setInvoices(p => p.map(x => x.id === inv.id ? upd : x));
+        syncDB.invoice(upd);
       },
-      color: "outline",
+      color: "red",
       sm: true
-    }, "\u2715")))))
+    }, "\uCDE8\uC18C")))))
   })), tab === 'form' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 12
