@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1656 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1719 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -1819,7 +1819,25 @@ function LoginPage({
   }, "\uB85C\uADF8\uC778")));
 }
 function App() {
-  const [user, setUser] = useState(() => LS.get('erp_session', null));
+  const [user, setUser] = useState(() => {
+    const saved = LS.get('erp_session', null);
+    if (!saved) return null;
+    // 옛날 데이터 마이그레이션: name이 '대표'이고 role이 명확하지 않으면 ceo로 자동 변환
+    if (saved.name === '대표' || saved.id === 'ADMIN001' || saved.id === '대표') {
+      const migrated = { ...saved, name: '신현민', email: 'shi9249', role: 'ceo', id: 'u001' };
+      LS.set('erp_session', migrated);
+      console.log('🔄 옛날 사용자 데이터 마이그레이션: 대표 → 신현민 (ceo)');
+      return migrated;
+    }
+    // role이 정의 안 됐거나 알 수 없는 값이면 ceo로 (안전)
+    if (!saved.role || !['ceo','admin','vice','staff'].includes(saved.role)) {
+      const fixed = { ...saved, role: 'ceo' };
+      LS.set('erp_session', fixed);
+      console.log('🔄 사용자 role 자동 수정: ceo');
+      return fixed;
+    }
+    return saved;
+  });
   const [selectedBuyer, setSelectedBuyer] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [page, setPage] = useState('dash');
@@ -2326,15 +2344,18 @@ function App() {
     // 관리자/전무는 모든 권한 자동 (대표가 명시적으로 false 설정한 경우만 차단)
     if (user.role === 'admin' || user.role === 'vice') {
       const p = user.permissions ? user.permissions[menuId] : null;
-      // 명시적으로 view: false 인 경우만 차단, 그 외는 모두 허용
       if (p && p.view === false) return false;
       return true;
     }
-    // 직원은 직원관리/결재함/리포트 차단
-    if (['report', 'approval', 'users'].includes(menuId)) return false;
-    // 직원은 권한 부여받은 만큼만
-    const p = user.permissions ? user.permissions[menuId] : null;
-    return p ? !!p.view : false;
+    // 직원
+    if (user.role === 'staff') {
+      if (['report', 'approval', 'users'].includes(menuId)) return false;
+      const p = user.permissions ? user.permissions[menuId] : null;
+      return p ? !!p.view : false;
+    }
+    // role이 정의되지 않거나 알 수 없는 값이면: 안전하게 ceo로 처리 (옛날 데이터 호환)
+    // 'admin', 'manager', 'vice', '대표' 등 어떤 값이라도 일단 모든 권한 부여
+    return true;
   };
   const canEdit = menuId => {
     if (!user) return false;
@@ -2344,10 +2365,14 @@ function App() {
       if (p && p.edit === false && p.create === false && p.update === false && p.delete === false) return false;
       return true;
     }
-    if (['report', 'approval', 'users'].includes(menuId)) return false;
-    const p = user.permissions ? user.permissions[menuId] : null;
-    if (!p) return false;
-    return p.edit || p.create || p.update || p.delete || false;
+    if (user.role === 'staff') {
+      if (['report', 'approval', 'users'].includes(menuId)) return false;
+      const p = user.permissions ? user.permissions[menuId] : null;
+      if (!p) return false;
+      return p.edit || p.create || p.update || p.delete || false;
+    }
+    // 알 수 없는 role → 안전 허용
+    return true;
   };
   const canCreate = menuId => {
     if (!user) return false;
@@ -2357,10 +2382,13 @@ function App() {
       if (p && p.create === false) return false;
       return true;
     }
-    if (['report', 'approval', 'users'].includes(menuId)) return false;
-    const p = user.permissions ? user.permissions[menuId] : null;
-    if (!p) return false;
-    return p.create !== undefined ? p.create : (p.edit || false);
+    if (user.role === 'staff') {
+      if (['report', 'approval', 'users'].includes(menuId)) return false;
+      const p = user.permissions ? user.permissions[menuId] : null;
+      if (!p) return false;
+      return p.create !== undefined ? p.create : (p.edit || false);
+    }
+    return true;
   };
   const canUpdate = menuId => {
     if (!user) return false;
@@ -2370,10 +2398,13 @@ function App() {
       if (p && p.update === false) return false;
       return true;
     }
-    if (['report', 'approval', 'users'].includes(menuId)) return false;
-    const p = user.permissions ? user.permissions[menuId] : null;
-    if (!p) return false;
-    return p.update !== undefined ? p.update : (p.edit || false);
+    if (user.role === 'staff') {
+      if (['report', 'approval', 'users'].includes(menuId)) return false;
+      const p = user.permissions ? user.permissions[menuId] : null;
+      if (!p) return false;
+      return p.update !== undefined ? p.update : (p.edit || false);
+    }
+    return true;
   };
   const canDelete = menuId => {
     if (!user) return false;
@@ -2383,10 +2414,13 @@ function App() {
       if (p && p.delete === false) return false;
       return true;
     }
-    if (['report', 'approval', 'users'].includes(menuId)) return false;
-    const p = user.permissions ? user.permissions[menuId] : null;
-    if (!p) return false;
-    return p.delete !== undefined ? p.delete : (p.edit || false);
+    if (user.role === 'staff') {
+      if (['report', 'approval', 'users'].includes(menuId)) return false;
+      const p = user.permissions ? user.permissions[menuId] : null;
+      if (!p) return false;
+      return p.delete !== undefined ? p.delete : (p.edit || false);
+    }
+    return true;
   };
   const canApprove = () => user && (user.role === 'ceo' || user.role === 'vice' || user.role === 'admin');
   const isStaff = () => user && user.role === 'staff';
