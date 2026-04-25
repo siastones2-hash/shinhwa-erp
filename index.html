@@ -1705,6 +1705,7 @@ function LoginPage({
 function App() {
   const [user, setUser] = useState(() => LS.get('erp_session', null));
   const [selectedBuyer, setSelectedBuyer] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [page, setPage] = useState('dash');
   const [receiptFilter, setReceiptFilter] = useState(null);
   const [toast, setToast] = useState(null);
@@ -2327,7 +2328,6 @@ function App() {
     label: '직원관리'
   }] : [])];
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const bottomMenus = visibleMenus.slice(0, 5);
   return /*#__PURE__*/React.createElement(AuthCtx.Provider, {
     value: ctx
