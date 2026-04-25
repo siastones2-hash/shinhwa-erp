@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1743 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1756 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -6532,29 +6532,7 @@ function SalesPage() {
       });
       setModal(true);
     }
-  }, "\u271A \uB9E4\uCD9C \uB4F1\uB85D"), user.role !== 'staff' && /*#__PURE__*/React.createElement("label", {
-    style: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 4,
-      padding: '8px 12px',
-      background: '#15803d',
-      color: '#fff',
-      borderRadius: 6,
-      cursor: 'pointer',
-      fontSize: 13,
-      fontWeight: 600
-    }
-  }, "📤 엑셀 업로드", /*#__PURE__*/React.createElement("input", {
-    type: "file",
-    accept: ".xlsx,.xls,.csv",
-    onChange: handleSalesImport,
-    style: { display: 'none' }
-  })), user.role !== 'staff' && /*#__PURE__*/React.createElement(Btn, {
-    onClick: downloadSalesTemplate,
-    color: "outline",
-    sm: true
-  }, "📋 템플릿"), /*#__PURE__*/React.createElement(Btn, {
+  }, "\u271A \uB9E4\uCD9C \uB4F1\uB85D"), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       const exportRows = filtered.map(s => ({
         '날짜': s.date || '',
@@ -7050,40 +7028,7 @@ function SalesPage() {
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save,
     color: "green"
-  }, user.role === 'staff' ? '✅ 승인 요청' : '✅ 등록')))), importSalesModal && /*#__PURE__*/React.createElement(Modal, {
-    title: '📤 매출 일괄 등록 - 미리보기',
-    onClose: () => { setImportSalesModal(false); setImportSalesPreview([]); }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { marginBottom: 12, padding: 12, background: '#eff6ff', borderRadius: 8, border: '1px solid #93c5fd' }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 4 }
-  }, "✅ ", importSalesPreview.length, "건의 매출 데이터 인식"), /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 11, color: '#64748b' }
-  }, "등록 시 미수금이 자동으로 생성됩니다 (입금예정일: 매출일+30일).")), /*#__PURE__*/React.createElement("div", {
-    style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
-  }, /*#__PURE__*/React.createElement("table", {
-    style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
-  }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['날짜', '거래처', '품목', '수량', '합계'].map(h => /*#__PURE__*/React.createElement("th", {
-    key: h,
-    style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
-  }, h)))), /*#__PURE__*/React.createElement("tbody", null, importSalesPreview.slice(0, 50).map((s, i) => /*#__PURE__*/React.createElement("tr", {
-    key: i,
-    style: { borderBottom: '1px solid #f1f5f9' }
-  }, /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, s.date),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, s.partner),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, s.item || '-'),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right' } }, s.qty),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 } }, won(s.total)))))), importSalesPreview.length > 50 && /*#__PURE__*/React.createElement("div", {
-    style: { textAlign: 'center', color: '#94a3b8', fontSize: 11, marginBottom: 8 }
-  }, "(50건만 미리보기 - 실제로는 ", importSalesPreview.length, "건 등록)"), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }
-  }, /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => { setImportSalesModal(false); setImportSalesPreview([]); },
-    color: 'outline'
-  }, "취소"), /*#__PURE__*/React.createElement(Btn, {
-    onClick: confirmSalesImport,
-    color: 'blue'
-  }, "➕ ", importSalesPreview.length, "건 모두 등록"))));
+  }, user.role === 'staff' ? '✅ 승인 요청' : '✅ 등록'))));
 }
 function PurchasePage() {
   const {
@@ -7495,29 +7440,7 @@ function PurchasePage() {
       });
       setModal(true);
     }
-  }, "\u271A \uB9E4\uC785 \uB4F1\uB85D"), user.role !== 'staff' && /*#__PURE__*/React.createElement("label", {
-    style: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 4,
-      padding: '8px 12px',
-      background: '#15803d',
-      color: '#fff',
-      borderRadius: 6,
-      cursor: 'pointer',
-      fontSize: 13,
-      fontWeight: 600
-    }
-  }, "📤 엑셀 업로드", /*#__PURE__*/React.createElement("input", {
-    type: "file",
-    accept: ".xlsx,.xls,.csv",
-    onChange: handlePurchImport,
-    style: { display: 'none' }
-  })), user.role !== 'staff' && /*#__PURE__*/React.createElement(Btn, {
-    onClick: downloadPurchTemplate,
-    color: "outline",
-    sm: true
-  }, "📋 템플릿"), /*#__PURE__*/React.createElement(Btn, {
+  }, "\u271A \uB9E4\uC785 \uB4F1\uB85D"), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       const exportRows = filtered.map(p => ({
         '날짜': p.date || '',
@@ -7930,40 +7853,7 @@ function PurchasePage() {
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save,
     color: "orange"
-  }, "\u2705 ", editTarget ? '수정' : '등록')))), importPurchModal && /*#__PURE__*/React.createElement(Modal, {
-    title: '📤 매입 일괄 등록 - 미리보기',
-    onClose: () => { setImportPurchModal(false); setImportPurchPreview([]); }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { marginBottom: 12, padding: 12, background: '#fff7ed', borderRadius: 8, border: '1px solid #fed7aa' }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 13, fontWeight: 700, color: '#c2410c', marginBottom: 4 }
-  }, "✅ ", importPurchPreview.length, "건의 매입 데이터 인식"), /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 11, color: '#64748b' }
-  }, "등록 시 미지급금이 자동 생성됩니다 (지급예정일: 매입일+30일).")), /*#__PURE__*/React.createElement("div", {
-    style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
-  }, /*#__PURE__*/React.createElement("table", {
-    style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
-  }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['날짜', '거래처', '품목', '수량', '합계'].map(h => /*#__PURE__*/React.createElement("th", {
-    key: h,
-    style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
-  }, h)))), /*#__PURE__*/React.createElement("tbody", null, importPurchPreview.slice(0, 50).map((p, i) => /*#__PURE__*/React.createElement("tr", {
-    key: i,
-    style: { borderBottom: '1px solid #f1f5f9' }
-  }, /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, p.date),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, p.partner),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, p.item || '-'),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right' } }, p.qty),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 } }, won(p.total)))))), importPurchPreview.length > 50 && /*#__PURE__*/React.createElement("div", {
-    style: { textAlign: 'center', color: '#94a3b8', fontSize: 11, marginBottom: 8 }
-  }, "(50건만 미리보기 - 실제로는 ", importPurchPreview.length, "건 등록)"), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }
-  }, /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => { setImportPurchModal(false); setImportPurchPreview([]); },
-    color: 'outline'
-  }, "취소"), /*#__PURE__*/React.createElement(Btn, {
-    onClick: confirmPurchImport,
-    color: 'orange'
-  }, "➕ ", importPurchPreview.length, "건 모두 등록"))));
+  }, "\u2705 ", editTarget ? '수정' : '등록'))));
 }
 function ReceiptPage() {
   const ctx = useAuth();
@@ -8415,39 +8305,7 @@ function ReceiptPage() {
         /*#__PURE__*/React.createElement(Input, { value: form.note, onChange: v => setForm(f => ({ ...f, note: v })), placeholder: '메모' })),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 } },
         /*#__PURE__*/React.createElement(Btn, { onClick: () => setModal(false), color: 'outline' }, '취소'),
-        /*#__PURE__*/React.createElement(Btn, { onClick: save }, '✅ 저장')))),
-    importRecpModal && /*#__PURE__*/React.createElement(Modal, {
-      title: '📤 수금 일괄 등록 - 미리보기',
-      onClose: () => { setImportRecpModal(false); setImportRecpPreview([]); }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: { marginBottom: 12, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac' }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 13, fontWeight: 700, color: '#166534', marginBottom: 4 }
-    }, "✅ ", importRecpPreview.length, "건의 수금 데이터 인식"), /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 11, color: '#64748b' }
-    }, "전액 수금된 건은 매출의 '수금완료' 자동 체크됩니다.")), /*#__PURE__*/React.createElement("div", {
-      style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
-    }, /*#__PURE__*/React.createElement("table", {
-      style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
-    }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['날짜', '거래처', '청구', '수금', '상태'].map(h => /*#__PURE__*/React.createElement("th", {
-      key: h,
-      style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
-    }, h)))), /*#__PURE__*/React.createElement("tbody", null, importRecpPreview.slice(0, 50).map((r, i) => /*#__PURE__*/React.createElement("tr", {
-      key: i,
-      style: { borderBottom: '1px solid #f1f5f9' }
-    }, /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, r.date),
-       /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, r.partner),
-       /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace' } }, won(r.billed)),
-       /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace', color: '#15803d', fontWeight: 700 } }, won(r.received)),
-       /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, r.status))))), /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }
-    }, /*#__PURE__*/React.createElement(Btn, {
-      onClick: () => { setImportRecpModal(false); setImportRecpPreview([]); },
-      color: 'outline'
-    }, "취소"), /*#__PURE__*/React.createElement(Btn, {
-      onClick: confirmRecpImport,
-      color: 'blue'
-    }, "➕ ", importRecpPreview.length, "건 모두 등록"))))
+        /*#__PURE__*/React.createElement(Btn, { onClick: save }, '✅ 저장'))))
   );
 }
 
@@ -8957,38 +8815,7 @@ function PaymentPage() {
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save,
     color: "purple"
-  }, "\u2705 \uB4F1\uB85D")))), importPayModal && /*#__PURE__*/React.createElement(Modal, {
-    title: '📤 지급 일괄 등록 - 미리보기',
-    onClose: () => { setImportPayModal(false); setImportPayPreview([]); }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { marginBottom: 12, padding: 12, background: '#faf5ff', borderRadius: 8, border: '1px solid #d8b4fe' }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 13, fontWeight: 700, color: '#7c3aed', marginBottom: 4 }
-  }, "✅ ", importPayPreview.length, "건의 지급 데이터 인식"), /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 11, color: '#64748b' }
-  }, "전액 지급된 건은 매입의 '지급완료' 자동 체크됩니다.")), /*#__PURE__*/React.createElement("div", {
-    style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
-  }, /*#__PURE__*/React.createElement("table", {
-    style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
-  }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['날짜', '거래처', '청구', '지급', '상태'].map(h => /*#__PURE__*/React.createElement("th", {
-    key: h,
-    style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
-  }, h)))), /*#__PURE__*/React.createElement("tbody", null, importPayPreview.slice(0, 50).map((p, i) => /*#__PURE__*/React.createElement("tr", {
-    key: i,
-    style: { borderBottom: '1px solid #f1f5f9' }
-  }, /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, p.date),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, p.partner),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace' } }, won(p.billed)),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace', color: '#7c3aed', fontWeight: 700 } }, won(p.paid)),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, p.status))))), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }
-  }, /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => { setImportPayModal(false); setImportPayPreview([]); },
-    color: 'outline'
-  }, "취소"), /*#__PURE__*/React.createElement(Btn, {
-    onClick: confirmPayImport,
-    color: 'purple'
-  }, "➕ ", importPayPreview.length, "건 모두 등록"))));
+  }, "\u2705 \uB4F1\uB85D"))));
 }
 function TaxPage() {
   const {
@@ -10714,48 +10541,7 @@ function BuyersPage() {
     color: "outline"
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save
-  }, "\u2705 \uC800\uC7A5")))), importModal && /*#__PURE__*/React.createElement(Modal, {
-    title: '📤 거래처 일괄 등록 - 미리보기',
-    onClose: () => { setImportModal(false); setImportPreview([]); }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { marginBottom: 12, padding: 12, background: '#eff6ff', borderRadius: 8, border: '1px solid #93c5fd' }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 4 }
-  }, "✅ ", importPreview.length, "건의 거래처를 인식했습니다"), /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 11, color: '#64748b' }
-  }, "추가할 방식을 선택하세요. 기존 거래처는 유지하면서 추가하거나, 모두 교체할 수 있습니다.")), /*#__PURE__*/React.createElement("div", {
-    style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
-  }, /*#__PURE__*/React.createElement("table", {
-    style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
-  }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['거래처명', '국가', '구분', '담당자', '이메일', '결제'].map(h => /*#__PURE__*/React.createElement("th", {
-    key: h,
-    style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
-  }, h)))), /*#__PURE__*/React.createElement("tbody", null, importPreview.slice(0, 50).map((b, i) => /*#__PURE__*/React.createElement("tr", {
-    key: i,
-    style: { borderBottom: '1px solid #f1f5f9' }
-  }, /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, b.name),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, b.country),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, b.type),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, b.contact || '-'),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, color: '#64748b' } }, b.email || '-'),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, b.payment))))), importPreview.length > 50 && /*#__PURE__*/React.createElement("div", {
-    style: { textAlign: 'center', color: '#94a3b8', fontSize: 11, marginBottom: 8 }
-  }, "(50건만 미리보기 - 실제로는 ", importPreview.length, "건 모두 등록됩니다)"), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, flexWrap: 'wrap' }
-  }, /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => { setImportModal(false); setImportPreview([]); },
-    color: 'outline'
-  }, "취소"), /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => confirmBuyerImport('append'),
-    color: 'blue'
-  }, "➕ 기존에 추가 (중복 자동 스킵)"), /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => {
-      if (window.confirm('⚠️ 기존 거래처를 모두 삭제하고 교체합니다. 정말 진행할까요?')) {
-        confirmBuyerImport('replace');
-      }
-    },
-    color: 'red'
-  }, "🔄 전체 교체"))));
+  }, "\u2705 \uC800\uC7A5"))));
 }
 function PriceListPage() {
   const {
@@ -11185,46 +10971,7 @@ function PriceListPage() {
     color: "outline"
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
     onClick: save
-  }, "\u2705 \uC800\uC7A5")))), importPlcModal && /*#__PURE__*/React.createElement(Modal, {
-    title: '📤 거래처단가 일괄 등록 - 미리보기',
-    onClose: () => { setImportPlcModal(false); setImportPlcPreview([]); }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { marginBottom: 12, padding: 12, background: '#eff6ff', borderRadius: 8, border: '1px solid #93c5fd' }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 4 }
-  }, "✅ ", importPlcPreview.length, "건의 단가 데이터 인식"), /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 11, color: '#64748b' }
-  }, "거래처 / 상품명이 기존 데이터와 매칭되면 자동 연결됩니다.")), /*#__PURE__*/React.createElement("div", {
-    style: { maxHeight: 350, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }
-  }, /*#__PURE__*/React.createElement("table", {
-    style: { width: '100%', fontSize: 11, borderCollapse: 'collapse' }
-  }, /*#__PURE__*/React.createElement("thead", { style: { position: 'sticky', top: 0, background: '#f8fafc' } }, /*#__PURE__*/React.createElement("tr", null, ['거래처', '상품', '단가', '매칭'].map(h => /*#__PURE__*/React.createElement("th", {
-    key: h,
-    style: { padding: 8, borderBottom: '2px solid #e2e8f0', fontSize: 10, fontWeight: 700, textAlign: 'left' }
-  }, h)))), /*#__PURE__*/React.createElement("tbody", null, importPlcPreview.slice(0, 50).map((p, i) => /*#__PURE__*/React.createElement("tr", {
-    key: i,
-    style: { borderBottom: '1px solid #f1f5f9' }
-  }, /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontWeight: 600 } }, p.buyer),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6 } }, p.product),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, textAlign: 'right', fontFamily: 'monospace' } }, won(p.price)),
-     /*#__PURE__*/React.createElement("td", { style: { padding: 6, fontSize: 10 } }, p.buyerId && p.productId ? '✅ 자동' : (p.buyerId ? '🟡 거래처만' : '⚠️ 신규')))))), importPlcPreview.length > 50 && /*#__PURE__*/React.createElement("div", {
-    style: { textAlign: 'center', color: '#94a3b8', fontSize: 11, marginBottom: 8 }
-  }, "(50건만 미리보기 - 실제로는 ", importPlcPreview.length, "건 모두 등록)"), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, flexWrap: 'wrap' }
-  }, /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => { setImportPlcModal(false); setImportPlcPreview([]); },
-    color: 'outline'
-  }, "취소"), /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => confirmPriceListImport('append'),
-    color: 'blue'
-  }, "➕ 기존에 추가"), /*#__PURE__*/React.createElement(Btn, {
-    onClick: () => {
-      if (window.confirm('⚠️ 기존 단가를 모두 삭제하고 교체합니다. 정말 진행할까요?')) {
-        confirmPriceListImport('replace');
-      }
-    },
-    color: 'red'
-  }, "🔄 전체 교체"))));
+  }, "\u2705 \uC800\uC7A5"))));
 }
 function ReportPage() {
   const {
