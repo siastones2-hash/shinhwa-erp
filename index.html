@@ -5663,6 +5663,7 @@ function SalesPage() {
     setStocks,
     showToast,
     canEdit,
+    canApprove,
     requestApproval,
     user,
     syncDB,
@@ -6125,10 +6126,21 @@ function SalesPage() {
         };
         setSales(prev => prev.map(x => x.id === s.id ? upd : x));
         syncDB.sale(upd);
+        setShowCanceled(false);
+        showToast('취소 처리됐어요', '#64748b');
       },
       color: "red",
       sm: true
-    }, "\uCDE8\uC18C")))))
+    }, "\uCDE8\uC18C"), canApprove && /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => {
+        if (!window.confirm('완전 삭제하시겠습니까?\n⚠️ 복구 불가능합니다!')) return;
+        setSales(prev => prev.filter(x => x.id !== s.id));
+        syncDB.delSale(s.id);
+        showToast('삭제됐어요', '#64748b');
+      },
+      color: "outline",
+      sm: true
+    }, "\uD83D\uDDD1\uFE0F")))))
   })), modal && /*#__PURE__*/React.createElement(Modal, {
     title: editTarget ? '💰 매출 수정' : '💰 매출 등록',
     onClose: () => {
@@ -6282,6 +6294,7 @@ function PurchasePage() {
     setStocks,
     showToast,
     canEdit,
+    canApprove,
     syncDB,
     user,
     requestApproval
@@ -6695,10 +6708,21 @@ function PurchasePage() {
         };
         setPurchases(prev => prev.map(x => x.id === s.id ? upd : x));
         syncDB.purchase(upd);
+        setShowCanceledP(false);
+        showToast('취소 처리됐어요', '#64748b');
       },
       color: "red",
       sm: true
-    }, "\uCDE8\uC18C")))))
+    }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => {
+        if (!window.confirm('완전 삭제하시겠습니까?\n⚠️ 복구 불가능합니다!')) return;
+        setPurchases(prev => prev.filter(x => x.id !== s.id));
+        syncDB.delPurchase(s.id);
+        showToast('삭제됐어요', '#64748b');
+      },
+      color: "outline",
+      sm: true
+    }, "\uD83D\uDDD1\uFE0F")))))
   })), modal && /*#__PURE__*/React.createElement(Modal, {
     title: editTarget ? '✏️ 매입 수정' : '🛒 매입 등록',
     onClose: () => {
@@ -6813,6 +6837,7 @@ function ReceiptPage() {
     setSales,
     showToast,
     canEdit,
+    canApprove,
     syncDB,
     user,
     requestApproval,
@@ -7153,8 +7178,19 @@ function ReceiptPage() {
           };
           setReceipts(prev => prev.map(x => x.id === r.id ? upd : x));
           syncDB.receipt(upd);
+          setShowCanceledR(false);
+          showToast('취소 처리됐어요', '#64748b');
         }
-      }, "\uCDE8\uC18C"))));
+      }, "\uCDE8\uC18C"), canApprove && /*#__PURE__*/React.createElement(Btn, {
+        sm: true,
+        color: "outline",
+        onClick: () => {
+          if (!window.confirm('완전 삭제하시겠습니까?\n⚠️ 복구 불가능합니다!')) return;
+          setReceipts(prev => prev.filter(x => x.id !== r.id));
+          syncDB.delReceipt(r.id);
+          showToast('삭제됐어요', '#64748b');
+        }
+      }, "\uD83D\uDDD1\uFE0F"))));
     })
   })), modal && /*#__PURE__*/React.createElement(Modal, {
     title: typeof modal === 'number' || typeof modal === 'string' && modal !== true ? '✏️ 수금 수정' : '💵 수금 등록',
@@ -7239,6 +7275,7 @@ function PaymentPage() {
     setPayments,
     showToast,
     canEdit,
+    canApprove,
     syncDB,
     user,
     requestApproval,
@@ -7530,7 +7567,16 @@ function PaymentPage() {
           setPayments(prev => prev.map(x => x.id === r.id ? upd : x));
           syncDB.payment(upd);
         }
-      }, "\uCDE8\uC18C")));
+      }, "\uCDE8\uC18C"), canApprove && /*#__PURE__*/React.createElement(Btn, {
+        sm: true,
+        color: "outline",
+        onClick: () => {
+          if (!window.confirm('완전 삭제하시겠습니까?\n⚠️ 복구 불가능합니다!')) return;
+          setPayments(prev => prev.filter(x => x.id !== r.id));
+          syncDB.delPayment(r.id);
+          showToast('삭제됐어요', '#64748b');
+        }
+      }, "\uD83D\uDDD1\uFE0F")));
     })
   })), modal && /*#__PURE__*/React.createElement(Modal, {
     title: typeof modal === 'number' || typeof modal === 'string' && modal !== true ? '✏️ 지급 수정' : '💸 지급 등록',
@@ -7616,6 +7662,7 @@ function TaxPage() {
     buyers,
     showToast,
     canEdit,
+    canApprove,
     syncDB,
     user,
     requestApproval
@@ -7800,7 +7847,16 @@ function TaxPage() {
       },
       color: "red",
       sm: true
-    }, "\uCDE8\uC18C")))))
+    }, "\uCDE8\uC18C"), canApprove && /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => {
+        if (!window.confirm('완전 삭제하시겠습니까?\n⚠️ 복구 불가능합니다!')) return;
+        setTaxInvoices(prev => prev.filter(x => x.id !== t.id));
+        syncDB.delTax(t.id);
+        showToast('삭제됐어요', '#64748b');
+      },
+      color: "outline",
+      sm: true
+    }, "\uD83D\uDDD1\uFE0F")))))
   })), modal && /*#__PURE__*/React.createElement(Modal, {
     title: editId ? '✏️ 세금계산서 수정' : '🧾 세금계산서 발행',
     onClose: () => {
@@ -7957,6 +8013,7 @@ function BuyersPage() {
     setBuyers,
     showToast,
     canEdit,
+    canApprove,
     syncDB,
     user
   } = useAuth();
@@ -9233,6 +9290,7 @@ function SchedulePage() {
     setSchedules,
     showToast,
     canEdit,
+    canApprove,
     syncDB,
     user,
     requestApproval,
@@ -9820,6 +9878,7 @@ function QuotePage() {
     pricelist,
     showToast,
     canEdit,
+    canApprove,
     user,
     getStock,
     syncDB,
@@ -10242,10 +10301,21 @@ function QuotePage() {
         };
         setQuotes(prev => prev.map(x => x.id === q.id ? upd : x));
         syncDB.quote(upd);
+        setShowCanceledQ(false);
+        showToast('취소 처리됐어요', '#64748b');
       },
       color: "red",
       sm: true
-    }, "\uCDE8\uC18C")))))
+    }, "\uCDE8\uC18C"), canApprove && /*#__PURE__*/React.createElement(Btn, {
+      onClick: () => {
+        if (!window.confirm('완전 삭제하시겠습니까?\n⚠️ 복구 불가능합니다!')) return;
+        setQuotes(prev => prev.filter(x => x.id !== q.id));
+        syncDB.delQuote(q.id);
+        showToast('삭제됐어요', '#64748b');
+      },
+      color: "outline",
+      sm: true
+    }, "\uD83D\uDDD1\uFE0F")))))
   })), historyModal && (() => {
     const bQuotes = [...quotes].filter(q => q.receiver === historyModal).reverse();
     return /*#__PURE__*/React.createElement(Modal, {
