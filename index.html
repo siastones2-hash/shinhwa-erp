@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-1852 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260425-1946 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -3991,7 +3991,117 @@ function ProductsPage() {
     }
     e.target.value = '';
   };
-  const confirmImport = mode => {
+
+  // 📤 수출양식 (사장님 회사 표준 양식) 업로드 처리
+  const parseExportFormat = (rows) => {
+    if (!rows || rows.length < 6) return [];
+    // 사장님 양식: 3행 메인헤더 / 4행 서브헤더 / 5행 설명 / 6행~ 실제 데이터
+    // 컬럼 매핑 (1-based 인덱스를 0-based로)
+    // 4=No, 6=품목명, 7=관리코드, 8=용량, 9=소비자가, 10=온라인최저가, 11=원가
+    // 12=제품사이즈, 13=무게, 14=바코드(개별), 15=입수량
+    // 16=박스사이즈, 17=박스무게, 18=바코드(박스)
+    // 19=MOQ, 20=HSCODE, 21=유통기한, 22=보관, 23=물류출고지
+    // 24=택배합포장, 25=택배사, 26=택배비, 27=기수출, 28=수출국가, 29=인증서
+    // 30=소개서, 31=팔렛카톤, 32=팔렛unit, 33=20fit, 34=40fit, 35=팔렛단수
+    // 36=특허, 37=입점현황, 38=마케팅, 39=생산MOQ, 40=리드타임
+    // 41=소구포인트, 42=URL, 43=카테고리, 44=비고
+    const products = [];
+    let autoIdCounter = 1;
+    for (let i = 5; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r) continue;
+      const name = String(r[5] || '').trim().replace(/\n/g, ' ');
+      if (!name) continue;
+      // ID 자동 생성 (관리코드 없으면)
+      let id = String(r[6] || '').trim();
+      if (!id) id = 'P' + String(autoIdCounter++).padStart(3, '0');
+      // 가격 파싱 (숫자 추출)
+      const parseNum = v => {
+        if (!v) return 0;
+        const s = String(v).replace(/[^0-9.\-]/g, '');
+        return parseFloat(s) || 0;
+      };
+      // 수출 정보 통합 메모 (17개 필드)
+      const exportInfoLines = [];
+      if (r[18]) exportInfoLines.push('MOQ(FOB): ' + r[18]);
+      if (r[19]) exportInfoLines.push('HS CODE: ' + r[19]);
+      if (r[20]) exportInfoLines.push('유통기한: ' + r[20]);
+      if (r[22]) exportInfoLines.push('출고지: ' + String(r[22]).replace(/\n/g, ' '));
+      if (r[11]) exportInfoLines.push('제품 규격: ' + String(r[11]).replace(/\n/g, ''));
+      if (r[12]) exportInfoLines.push('제품 무게: ' + r[12]);
+      if (r[15]) exportInfoLines.push('박스 규격: ' + String(r[15]).replace(/\n/g, ''));
+      if (r[16]) exportInfoLines.push('박스 무게: ' + r[16]);
+      if (r[26]) exportInfoLines.push('기수출: ' + r[26]);
+      if (r[27]) exportInfoLines.push('수출국가: ' + r[27]);
+      if (r[28]) exportInfoLines.push('인증: ' + String(r[28]).replace(/\n/g, ' '));
+      if (r[29]) exportInfoLines.push('소개서: ' + r[29]);
+      if (r[30]) exportInfoLines.push('팔렛(카톤): ' + String(r[30]).replace(/\n/g, ' '));
+      if (r[31]) exportInfoLines.push('팔렛(unit): ' + String(r[31]).replace(/\n/g, ' '));
+      if (r[32]) exportInfoLines.push('20ft: ' + r[32]);
+      if (r[33]) exportInfoLines.push('40ft: ' + String(r[33]).replace(/\n/g, ' '));
+      if (r[35]) exportInfoLines.push('특허: ' + r[35]);
+      if (r[36]) exportInfoLines.push('입점현황: ' + r[36]);
+      if (r[37]) exportInfoLines.push('마케팅: ' + r[37]);
+      if (r[38]) exportInfoLines.push('생산 MOQ: ' + r[38]);
+      if (r[39]) exportInfoLines.push('리드타임: ' + String(r[39]).replace(/\n/g, ' '));
+      if (r[40]) exportInfoLines.push('소구포인트: ' + String(r[40]).replace(/\n/g, ' / '));
+      if (r[41]) exportInfoLines.push('URL: ' + r[41]);
+      if (r[43]) exportInfoLines.push('비고: ' + r[43]);
+      const exportInfo = exportInfoLines.join('\n');
+      const product = {
+        id: id,
+        ko: name,
+        en: '',
+        cat: String(r[42] || '').trim() || '기타',
+        capacity: String(r[7] || '').trim(),
+        cost: parseNum(r[10]),
+        sale: parseNum(r[9]),
+        consumer: parseNum(r[8]),
+        inbox: parseNum(r[14]),
+        ship: parseNum(r[25]),
+        barcode: String(r[13] || '').trim(),
+        boxBarcode: String(r[17] || '').trim(),
+        hscode: String(r[19] || '').trim(),
+        storage: String(r[21] || '').trim(),
+        exportInfo: exportInfo
+      };
+      products.push(product);
+    }
+    return products;
+  };
+  const handleExportFormatImport = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const data = new Uint8Array(ev.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          // 'list' 시트 우선, 없으면 첫번째 시트
+          const sheetName = workbook.SheetNames.includes('list') ? 'list' : workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+          const parsed = parseExportFormat(rows);
+          if (parsed.length === 0) {
+            showToast('인식된 상품이 없습니다. 양식을 확인하세요.', '#ea580c');
+            return;
+          }
+          setImportPreview(parsed);
+          setImportModal(true);
+          showToast(`✅ ${parsed.length}개 상품 인식 완료!`, '#15803d');
+        } catch (err) {
+          console.error('수출양식 파싱 오류:', err);
+          showToast('파일 읽기 오류: ' + err.message, '#dc2626');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      showToast('수출양식은 .xlsx 파일만 지원합니다', '#ea580c');
+    }
+    e.target.value = '';
+  };
+    const confirmImport = mode => {
     if (mode === 'replace') {
       setProducts(importPreview);
       showToast(`✅ ${importPreview.length}개 상품으로 전체 교체 완료!`, '#15803d');
@@ -4156,6 +4266,18 @@ function ProductsPage() {
     type: "file",
     accept: ".xlsx,.xls,.csv",
     onChange: handleFileImport,
+    style: {
+      display: 'none'
+    }
+  })), /*#__PURE__*/React.createElement("label", {
+    style: {
+      ...btnStyle('blue', true),
+      cursor: 'pointer'
+    }
+  }, "\uD83D\uDCE4 \uC218\uCD9C\uC591\uC2DD \uC5C5\uB85C\uB4DC", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".xlsx,.xls",
+    onChange: handleExportFormatImport,
     style: {
       display: 'none'
     }
