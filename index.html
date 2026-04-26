@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260425-2003 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260426-0057 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -2155,8 +2155,6 @@ function App() {
         const validRoles = ['ceo', 'admin', 'staff'];
         const cleaned = data.map(u => {
           const safeRole = validRoles.includes(u.role) ? u.role : (u.role === 'vice' ? 'admin' : 'staff');
-          // Supabase erp_users 테이블에는 phone, dept 컬럼이 없으므로 제외
-          // (LS에는 그대로 저장됨)
           return {
             id: String(u.id || ('u' + Date.now())),
             name: String(u.name || ''),
@@ -2164,7 +2162,9 @@ function App() {
             password: String(u.password || '1234'),
             role: safeRole,
             permissions: u.permissions && typeof u.permissions === 'object' ? u.permissions : {},
-            active: u.active !== false
+            active: u.active !== false,
+            phone: String(u.phone || ''),
+            dept: String(u.dept || '')
           };
         });
         // upsert 단건씩 - replace는 일괄삭제 후 재생성이라 RLS/제약 충돌 가능
