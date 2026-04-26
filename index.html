@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260426-0231 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260426-0527 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -2446,7 +2446,9 @@ function App() {
       approvedAt: null,
       comment: ''
     };
-    setApprovals(prev => [a, ...prev]);
+    const newApprovals = [a, ...approvals];
+    setApprovals(newApprovals);
+    if (syncDB.approval) syncDB.approval(a);
     showToast('✅ 승인 요청이 전송됐습니다!');
     return a.id;
   };
@@ -4262,8 +4264,21 @@ function ProductsPage() {
           const buyerRows = XLSX.utils.sheet_to_json(buyerSheet, { header: 1, defval: '' });
           buyerPrices = parseShiBuyerPrices(buyerRows);
         }
+        // 디버그 정보 출력
+        console.log('📊 SHI 마스터 디버그:');
+        console.log('  시트 목록:', workbook.SheetNames);
+        console.log('  사용 시트:', mainSheetName);
+        console.log('  시트 행 수:', mainRows.length);
+        if (mainRows.length > 0) console.log('  첫 행 길이:', mainRows[0].length);
+        if (mainRows.length > 5) console.log('  6번째 행 (인덱스 5):', mainRows[5]);
+        console.log('  파싱된 상품 수:', parsed.length);
+        console.log('  통계:', stats);
         if (parsed.length === 0) {
-          showToast('인식된 상품이 없습니다.', '#ea580c');
+          const debugMsg = '인식된 상품이 없습니다.\n\n시트: ' + mainSheetName + 
+            '\n시트 행 수: ' + mainRows.length +
+            '\n전체 처리: ' + stats.total + '개';
+          showToast(debugMsg, '#ea580c');
+          alert('🔍 디버그 정보:\n\n' + debugMsg + '\n\n브라우저 F12 → Console 탭 확인');
           return;
         }
         const msg = '📦 SHI 마스터 분석 완료 (시트: ' + mainSheetName + ')\n\n' +
@@ -4286,6 +4301,7 @@ function ProductsPage() {
           ...newProducts
         ];
         setProducts(merged);
+        syncDB.products(merged);
         showToast('✅ 신규 ' + newProducts.length + '개 + 업데이트 ' + updatedProducts.length + '개!', '#15803d');
       } catch (err) {
         console.error('SHI 마스터 파싱 오류:', err);
@@ -4405,11 +4421,14 @@ function ProductsPage() {
     const confirmImport = mode => {
     if (mode === 'replace') {
       setProducts(importPreview);
+      syncDB.products(importPreview);
       showToast(`✅ ${importPreview.length}개 상품으로 전체 교체 완료!`, '#15803d');
     } else {
       const existIds = new Set(products.map(p => p.id));
       const newOnes = importPreview.filter(p => !existIds.has(p.id));
-      setProducts(prev => [...prev, ...newOnes]);
+      const newList = [...products, ...newOnes];
+      setProducts(newList);
+      syncDB.products(newList);
       showToast(`✅ ${newOnes.length}개 추가! (중복 ${importPreview.length - newOnes.length}개 제외)`, '#15803d');
     }
     setImportModal(false);
@@ -4638,6 +4657,7 @@ function ProductsPage() {
         }
         const db = JSON.parse(new TextDecoder().decode(buf));
         setProducts(db);
+        syncDB.products(db);
         showToast(`✅ ${db.length}개 상품 로드 완료!`, '#15803d');
       } catch (e) {
         showToast('오류: ' + e.message, '#dc2626');
@@ -14423,6 +14443,7 @@ function MyPage() {
     setUser(updated);
     setUsers(prev => prev.map(u => u.id === user.id ? updated : u));
     LS.set('erp_session', updated);
+    if (syncDB.user) syncDB.user(updated);
     sb.upsert('erp_users', {
       id: updated.id,
       name: updated.name,
@@ -14799,20 +14820,20 @@ function MyPage() {
             const itemCount = Object.values(backup.data).reduce((a, arr) => a + (Array.isArray(arr) ? arr.length : 0), 0);
             if (!window.confirm('\uBC31\uC5C5 \uD30C\uC77C: ' + (backup.exportedAt || '?').slice(0, 10) + '\n\uCD1D ' + itemCount + '\uAC1C \uB370\uC774\uD130\n\n\u26A0\uFE0F \uD604\uC7AC \uB370\uC774\uD130\uAC00 \uBAA8\uB450 \uB36E\uC5B4\uC4F0\uC5EC\uC9D1\uB2C8\uB2E4!\n\uACC4\uC18D\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?')) return;
             const d = backup.data;
-            if (d.users) setUsers(d.users);
-            if (d.products) setProducts(d.products);
-            if (d.buyers) setBuyers(d.buyers);
-            if (d.stocks) setStocks(d.stocks);
-            if (d.sales) setSales(d.sales);
-            if (d.purchases) setPurchases(d.purchases);
-            if (d.receipts) setReceipts(d.receipts);
-            if (d.payments) setPayments(d.payments);
+            if (d.users) { setUsers(d.users); if (syncDB.users) syncDB.users(d.users); }
+            if (d.products) { setProducts(d.products); if (syncDB.products) syncDB.products(d.products); }
+            if (d.buyers) { setBuyers(d.buyers); if (syncDB.buyers) syncDB.buyers(d.buyers); }
+            if (d.stocks) { setStocks(d.stocks); if (syncDB.stocks) syncDB.stocks(d.stocks); }
+            if (d.sales) { setSales(d.sales); if (syncDB.sales) syncDB.sales(d.sales); }
+            if (d.purchases) { setPurchases(d.purchases); if (syncDB.purchases) syncDB.purchases(d.purchases); }
+            if (d.receipts) { setReceipts(d.receipts); if (syncDB.receipts) syncDB.receipts(d.receipts); }
+            if (d.payments) { setPayments(d.payments); if (syncDB.payments) syncDB.payments(d.payments); }
             if (d.taxInvoices) setTaxInvoices(d.taxInvoices);
-            if (d.quotes) setQuotes(d.quotes);
-            if (d.invoices) setInvoices(d.invoices);
-            if (d.schedules) setSchedules(d.schedules);
+            if (d.quotes) { setQuotes(d.quotes); if (syncDB.quotes) syncDB.quotes(d.quotes); }
+            if (d.invoices) { setInvoices(d.invoices); if (syncDB.invoices) syncDB.invoices(d.invoices); }
+            if (d.schedules) { setSchedules(d.schedules); if (syncDB.schedules) syncDB.schedules(d.schedules); }
             if (d.pricelist) setPricelist(d.pricelist);
-            if (d.approvals) setApprovals(d.approvals);
+            if (d.approvals) { setApprovals(d.approvals); if (syncDB.approvals) syncDB.approvals(d.approvals); }
             showToast('\u2705 \uBCF5\uC6D0 \uC644\uB8CC! ' + itemCount + '\uAC1C \uB370\uC774\uD130');
           } catch (err) {
             alert('\uBC31\uC5C5 \uD30C\uC77C \uC77D\uAE30 \uC2E4\uD328: ' + err.message);
@@ -15267,7 +15288,13 @@ function UsersPage() {
       });
       setModal(true);
     }
-  }, "\u271A \uC9C1\uC6D0 \uCD94\uAC00")), users.map(u => /*#__PURE__*/React.createElement(Card, {
+  }, "\u271A \uC9C1\uC6D0 \uCD94\uAC00")), [...users].sort((a, b) => {
+    const order = { '대표': 1, '전무': 2, '본부장': 3, '과장': 4 };
+    const aOrd = order[a.dept] || 99;
+    const bOrd = order[b.dept] || 99;
+    if (aOrd !== bOrd) return aOrd - bOrd;
+    return (a.id || '').localeCompare(b.id || '');
+  }).map(u => /*#__PURE__*/React.createElement(Card, {
     key: u.id,
     style: {
       marginBottom: 12
@@ -15343,6 +15370,7 @@ function UsersPage() {
       }
       if (!confirmDel(`'${u.name}' 직원을 삭제하시겠습니까?`)) return;
       setUsers(prev => prev.filter(x => x.id !== u.id));
+      if (syncDB.delUser) syncDB.delUser(u.id);
       showToast('🗑️ 삭제 완료');
     },
     color: "outline",
@@ -15664,13 +15692,15 @@ function ApprovalPage() {
       setSchedules(prev => [...prev, d]);
       syncDB.schedule(d);
     }
-    setApprovals(prev => prev.map(x => x.id === a.id ? {
-      ...x,
+    const updated = {
+      ...a,
       status: '승인',
       approvedBy: user.name,
       approvedAt: todayStr(),
       comment: comment || ''
-    } : x));
+    };
+    setApprovals(prev => prev.map(x => x.id === a.id ? updated : x));
+    if (syncDB.approval) syncDB.approval(updated);
     setComment('');
     setCommentId(null);
     showToast('✅ 승인 완료! 데이터 반영됐습니다.', '#15803d');
@@ -15680,13 +15710,15 @@ function ApprovalPage() {
       showToast('승인 권한이 없습니다', '#dc2626');
       return;
     }
-    setApprovals(prev => prev.map(x => x.id === a.id ? {
-      ...x,
+    const rejected = {
+      ...a,
       status: '반려',
       approvedBy: user.name,
       approvedAt: todayStr(),
       comment: comment || '사유 없음'
-    } : x));
+    };
+    setApprovals(prev => prev.map(x => x.id === a.id ? rejected : x));
+    if (syncDB.approval) syncDB.approval(rejected);
     setComment('');
     setCommentId(null);
     showToast('🚫 반려됐습니다.', '#dc2626');
