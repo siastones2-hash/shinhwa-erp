@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260426-0057 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260426-0142 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -3729,7 +3729,8 @@ function ProductsPage() {
     sale: '',
     ship: '',
     inbox: '',
-    safe: ''
+    safe: '',
+    useExchange: false
   });
   const editable = canEdit('products');
   const filtered = (() => {
@@ -4109,6 +4110,192 @@ function ProductsPage() {
     }
     e.target.value = '';
   };
+  // 📤 SHI 마스터 업로드 (사장님 16시트 엑셀 통합)
+  const parseShiMasterSheet = (rows) => {
+    if (!rows || rows.length < 6) return { products: [], stats: {} };
+    const products = [];
+    const stats = { total: 0, autoId: 0, duplicateId: 0, noKor: 0, noCategory: 0, noBrand: 0 };
+    let autoIdCounter = 1;
+    const usedIds = new Set();
+    for (let i = 5; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r) continue;
+      const nameKor = String(r[7] || '').trim().replace(/\n/g, ' ');
+      const nameEng = String(r[4] || '').trim().replace(/\n/g, ' ');
+      const name = nameKor || nameEng;
+      if (!name || name === 'Product name KR' || name === 'Product name EN' || name === 'image' || name === 'Brand') continue;
+      stats.total++;
+      let id = String(r[8] || '').trim();
+      if (!id || id === 'Management code' || id.includes('Management')) {
+        do {
+          id = 'AUTO' + String(autoIdCounter++).padStart(4, '0');
+        } while (usedIds.has(id));
+        stats.autoId++;
+      }
+      if (usedIds.has(id)) {
+        let suffix = 2;
+        let newId = id + '_' + suffix;
+        while (usedIds.has(newId)) {
+          suffix++;
+          newId = id + '_' + suffix;
+        }
+        id = newId;
+        stats.duplicateId++;
+      }
+      usedIds.add(id);
+      const parseNum = v => {
+        if (v === null || v === undefined || v === '') return 0;
+        const s = String(v).replace(/[^0-9.\-]/g, '');
+        const n = parseFloat(s);
+        return isNaN(n) ? 0 : n;
+      };
+      let cat = String(r[5] || '').trim().split('\n')[0] || '';
+      if (!cat || cat === 'Category KOR' || cat === 'Category') {
+        cat = '기타';
+        stats.noCategory++;
+      }
+      let brand = String(r[3] || '').trim();
+      if (!brand || brand === 'Brand') {
+        brand = '';
+        stats.noBrand++;
+      }
+      if (!nameKor) stats.noKor++;
+      const exportInfoLines = [];
+      if (r[21]) exportInfoLines.push('MOQ(FOB): ' + r[21]);
+      if (r[22]) exportInfoLines.push('HS CODE: ' + String(r[22]).replace(/\n/g, ' '));
+      if (r[23]) exportInfoLines.push('유통기한: ' + r[23]);
+      if (r[24]) exportInfoLines.push('보관: ' + r[24]);
+      if (r[25]) exportInfoLines.push('출고지: ' + String(r[25]).replace(/\n/g, ' '));
+      if (r[14]) exportInfoLines.push('제품규격: ' + String(r[14]).replace(/\n/g, ''));
+      if (r[15]) exportInfoLines.push('제품무게: ' + r[15] + 'g');
+      if (r[18]) exportInfoLines.push('박스규격: ' + String(r[18]).replace(/\n/g, ''));
+      if (r[19]) exportInfoLines.push('박스무게: ' + r[19]);
+      if (r[29]) exportInfoLines.push('기수출: ' + r[29]);
+      if (r[30]) exportInfoLines.push('수출국가: ' + String(r[30]).replace(/\n/g, ' '));
+      if (r[31]) exportInfoLines.push('인증서: ' + String(r[31]).replace(/\n/g, ' '));
+      if (r[40]) exportInfoLines.push('팔렛(박스): ' + String(r[40]).replace(/\n/g, ' '));
+      if (r[41]) exportInfoLines.push('팔렛(unit): ' + String(r[41]).replace(/\n/g, ' '));
+      if (r[42]) exportInfoLines.push('20ft: ' + r[42]);
+      if (r[43]) exportInfoLines.push('40ft: ' + String(r[43]).replace(/\n/g, ' '));
+      if (r[44]) exportInfoLines.push('팔렛단수: ' + r[44]);
+      if (r[45]) exportInfoLines.push('특허: ' + r[45]);
+      if (r[46]) exportInfoLines.push('입점현황: ' + String(r[46]).replace(/\n/g, ' '));
+      if (r[47]) exportInfoLines.push('마케팅: ' + String(r[47]).replace(/\n/g, ' '));
+      if (r[48]) exportInfoLines.push('생산MOQ: ' + r[48]);
+      if (r[49]) exportInfoLines.push('리드타임: ' + String(r[49]).replace(/\n/g, ' '));
+      if (r[50]) exportInfoLines.push('소구포인트: ' + String(r[50]).replace(/\n/g, ' / '));
+      if (r[51]) exportInfoLines.push('비고: ' + r[51]);
+      const exportInfo = exportInfoLines.join('\n');
+      const fobUsd = parseNum(r[13]);
+      const consumerUsd = parseNum(r[11]);
+      const hasUsdPrice = fobUsd > 0 || consumerUsd > 0;
+      products.push({
+        id: id,
+        ko: nameKor || nameEng,
+        en: nameEng,
+        cat: cat,
+        sp: String(r[9] || '').trim(),
+        brand: brand,
+        cost: parseNum(r[12]),
+        sale: parseNum(r[10]),
+        consumer: parseNum(r[10]),
+        fob: fobUsd,
+        ship: parseNum(r[28]),
+        inbox: parseNum(r[17]) || 1,
+        safe: 0,
+        barcode: String(r[16] || '').trim(),
+        boxBarcode: String(r[20] || '').trim(),
+        hscode: String(r[22] || '').trim().replace(/\n/g, ' '),
+        storage: String(r[24] || '').trim(),
+        useExchange: hasUsdPrice,
+        exportInfo: exportInfo,
+        status: 'active'
+      });
+    }
+    return { products: products, stats: stats };
+  };
+  const parseShiBuyerPrices = (rows) => {
+    if (!rows || rows.length < 2) return [];
+    const prices = [];
+    let lastBuyer = '';
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r) continue;
+      const buyer = String(r[0] || '').trim();
+      const item = String(r[1] || '').trim();
+      const price = parseFloat(String(r[2] || '').replace(/[^0-9.\-]/g, '')) || 0;
+      if (buyer) lastBuyer = buyer;
+      if (!item || item === '택배비' || item === '품목명' || price === 0) continue;
+      prices.push({ buyer: lastBuyer, item: item, price: price });
+    }
+    return prices;
+  };
+  const handleShiMasterImport = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      showToast('SHI 마스터는 .xlsx 파일만 지원합니다', '#ea580c');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = new Uint8Array(ev.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        let mainSheetName = null;
+        const candidates = ['SHI-CATEGORY KOR', '식품', '화장품', '잡화', '스낵'];
+        for (const c of candidates) {
+          if (workbook.SheetNames.includes(c)) {
+            mainSheetName = c;
+            break;
+          }
+        }
+        if (!mainSheetName) mainSheetName = workbook.SheetNames[0];
+        const mainSheet = workbook.Sheets[mainSheetName];
+        const mainRows = XLSX.utils.sheet_to_json(mainSheet, { header: 1, defval: '' });
+        const result = parseShiMasterSheet(mainRows);
+        const parsed = result.products;
+        const stats = result.stats;
+        let buyerPrices = [];
+        if (workbook.SheetNames.includes('거래처정보')) {
+          const buyerSheet = workbook.Sheets['거래처정보'];
+          const buyerRows = XLSX.utils.sheet_to_json(buyerSheet, { header: 1, defval: '' });
+          buyerPrices = parseShiBuyerPrices(buyerRows);
+        }
+        if (parsed.length === 0) {
+          showToast('인식된 상품이 없습니다.', '#ea580c');
+          return;
+        }
+        const msg = '📦 SHI 마스터 분석 완료 (시트: ' + mainSheetName + ')\n\n' +
+          '✅ 인식된 상품: ' + parsed.length + '개\n' +
+          '  - 자동 ID 생성: ' + stats.autoId + '개\n' +
+          '  - 중복 ID 자동 처리: ' + stats.duplicateId + '개\n' +
+          '  - 카테고리 미입력: ' + stats.noCategory + '개\n' +
+          '  - 브랜드 미입력: ' + stats.noBrand + '개\n\n' +
+          '💰 거래처 단가: ' + buyerPrices.length + '개\n\n' +
+          '진행하시겠습니까?\n(기존 상품은 업데이트, 새 상품은 추가)';
+        if (!confirm(msg)) return;
+        const existingIds = new Set(products.map(p => p.id));
+        const newProducts = parsed.filter(p => !existingIds.has(p.id));
+        const updatedProducts = parsed.filter(p => existingIds.has(p.id));
+        const merged = [
+          ...products.map(p => {
+            const updated = updatedProducts.find(u => u.id === p.id);
+            return updated ? { ...p, ...updated } : p;
+          }),
+          ...newProducts
+        ];
+        setProducts(merged);
+        showToast('✅ 신규 ' + newProducts.length + '개 + 업데이트 ' + updatedProducts.length + '개!', '#15803d');
+      } catch (err) {
+        console.error('SHI 마스터 파싱 오류:', err);
+        showToast('파일 읽기 오류: ' + err.message, '#dc2626');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
+
     const confirmImport = mode => {
     if (mode === 'replace') {
       setProducts(importPreview);
@@ -4218,7 +4405,7 @@ function ProductsPage() {
       gap: 8,
       alignItems: 'center'
     }
-  }, editable && products.length < 5 && /*#__PURE__*/React.createElement(Btn, {
+  }, editable && /*#__PURE__*/React.createElement(Btn, {
     onClick: async () => {
       // ── 3단계 안전장치 ──
       if (!window.confirm('⚠️ 상품DB 초기화\n\n현재 상품이 모두 초기화됩니다.\n계속하시겠습니까?')) return;
@@ -4289,6 +4476,22 @@ function ProductsPage() {
     style: {
       display: 'none'
     }
+  })), /*#__PURE__*/React.createElement("label", {
+    style: {
+      ...btnStyle('outline', true),
+      cursor: 'pointer',
+      background: '#7c3aed',
+      color: 'white',
+      border: '2px solid #6d28d9',
+      fontWeight: 700
+    }
+  }, "\uD83D\uDCC2 SHI \uB9C8\uC2A4\uD130 \uC5C5\uB85C\uB4DC", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".xlsx,.xls",
+    onChange: handleShiMasterImport,
+    style: {
+      display: 'none'
+    }
   })), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       setForm({
@@ -4303,7 +4506,8 @@ function ProductsPage() {
         sale: '',
         ship: '',
         inbox: '',
-        safe: ''
+        safe: '',
+        useExchange: false
       });
       setModal(true);
     }
@@ -4540,7 +4744,18 @@ function ProductsPage() {
         fontSize: 12,
         color: '#1d4ed8'
       }
-    }, p.ko), p.en && /*#__PURE__*/React.createElement("div", {
+    }, p.ko, p.useExchange && /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: 6,
+        padding: '1px 5px',
+        background: '#dbeafe',
+        color: '#1e40af',
+        borderRadius: 4,
+        fontSize: 10,
+        fontWeight: 600
+      },
+      title: "\uD658\uC728 \uC801\uC6A9 \uC0C1\uD488"
+    }, "\uD83D\uDCB1")), p.en && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10,
         color: '#64748b'
@@ -4861,7 +5076,27 @@ function ProductsPage() {
       safe: v
     })),
     type: "number"
-  })), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
+  })), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '12px',
+      background: form.useExchange ? '#dbeafe' : '#f3f4f6',
+      border: form.useExchange ? '2px solid #3b82f6' : '1px solid #d1d5db',
+      borderRadius: 8,
+      marginBottom: 12,
+      cursor: 'pointer',
+      transition: 'all 0.2s'
+    },
+    onClick: () => setForm(f => ({...f, useExchange: !f.useExchange}))
+  }, /*#__PURE__*/React.createElement("label", {
+    style: { display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14, fontWeight: 600 }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: form.useExchange || false,
+    onChange: e => setForm(f => ({...f, useExchange: e.target.checked})),
+    style: { width: 18, height: 18, cursor: 'pointer' }
+  }), /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDCB1"), "\uD658\uC728 \uC801\uC6A9 (\uC218\uCD9C\uC6A9)"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, color: form.useExchange ? '#1e40af' : '#6b7280', marginTop: 6, marginLeft: 28 }
+  }, form.useExchange ? "\u2705 \uD658\uC728 \uC801\uC6A9 (USD \uAC00\uACA9 \uC790\uB3D9 \uACC4\uC0B0)" : "\u274C \uD658\uC728 \uBBF8\uC801\uC6A9 (\uD55C\uAD6D \uAC70\uB798\uC6A9 - \uC6D0\uD654\uB9CC)"))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uC774\uBBF8\uC9C0 URL (\uC120\uD0DD)"
   }, /*#__PURE__*/React.createElement(Input, {
     value: form.img || '',
