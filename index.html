@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260426-0208 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260426-0217 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -4563,7 +4563,19 @@ function ProductsPage() {
       background: '#fef2f2',
       color: '#991b1b'
     }
-  }, "\u26A0\uFE0F \uCD08\uAE30\uD654"), editable && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React./*#__PURE__*/React.createElement("label", {
+  }, "\u26A0\uFE0F \uCD08\uAE30\uD654"), editable && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      ...btnStyle('outline', true),
+      cursor: 'pointer'
+    }
+  }, "\uD83D\uDCE4 \uC5D1\uC140 \uC5C5\uB85C\uB4DC", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".xlsx,.xls,.csv",
+    onChange: handleFileImport,
+    style: {
+      display: 'none'
+    }
+  })), /*#__PURE__*/React.createElement("label", {
     style: {
       ...btnStyle('blue', true),
       cursor: 'pointer'
