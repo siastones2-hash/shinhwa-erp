@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260426-0142 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260426-0208 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -4295,6 +4295,112 @@ function ProductsPage() {
     reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
+  // 🔄 중복 상품 자동 통합
+  const findDuplicates = () => {
+    const groups = new Map();
+    products.forEach(p => {
+      const normName = String(p.ko || p.en || '').toLowerCase().replace(/\s+/g, '').trim();
+      const normSp = String(p.sp || '').toLowerCase().replace(/\s+/g, '').trim();
+      if (!normName) return;
+      const key = normName + '|' + normSp;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(p);
+    });
+    const barcodeGroups = new Map();
+    products.forEach(p => {
+      const bc = String(p.barcode || '').trim();
+      if (!bc || bc.length < 8) return;
+      if (!barcodeGroups.has(bc)) barcodeGroups.set(bc, []);
+      barcodeGroups.get(bc).push(p);
+    });
+    const duplicates = [];
+    groups.forEach((group, key) => {
+      if (group.length > 1) {
+        duplicates.push({ key: '이름+용량', items: group });
+      }
+    });
+    barcodeGroups.forEach((group, key) => {
+      if (group.length > 1) {
+        const ids = group.map(p => p.id).sort().join(',');
+        const exists = duplicates.some(d => d.items.map(p => p.id).sort().join(',') === ids);
+        if (!exists) {
+          duplicates.push({ key: '바코드', items: group });
+        }
+      }
+    });
+    return duplicates;
+  };
+  const handleAutoMerge = () => {
+    if (!editable) {
+      showToast('권한이 없습니다', '#dc2626');
+      return;
+    }
+    const duplicates = findDuplicates();
+    if (duplicates.length === 0) {
+      showToast('🎉 중복 상품이 없습니다!', '#15803d');
+      return;
+    }
+    let preview = '🔍 중복 상품 ' + duplicates.length + '그룹 발견!\n\n';
+    duplicates.slice(0, 8).forEach((d, i) => {
+      preview += (i+1) + '. ' + d.items.length + '개 중복:\n';
+      d.items.slice(0, 3).forEach(p => {
+        preview += '   - ' + p.id + ': ' + (p.ko || p.en || '?').substring(0, 30) + '\n';
+      });
+    });
+    if (duplicates.length > 8) preview += '\n... 외 ' + (duplicates.length - 8) + '그룹 더 있음\n';
+    preview += '\n[자동 통합 방식]\n';
+    preview += '- 정보 많은 상품 유지\n';
+    preview += '- 매출/매입 기록 자동 이전\n';
+    preview += '- 다른 상품 자동 삭제\n\n';
+    preview += '진행하시겠습니까?';
+    if (!confirm(preview)) return;
+    const productsToDelete = new Set();
+    const idMapping = new Map();
+    let mergedCount = 0;
+    duplicates.forEach(d => {
+      const scored = d.items.map(p => {
+        let score = 0;
+        if (p.ko) score += 10;
+        if (p.en) score += 5;
+        if (p.brand) score += 5;
+        if (p.cat && p.cat !== '기타') score += 5;
+        if (p.cost > 0) score += 10;
+        if (p.sale > 0) score += 10;
+        if (p.consumer > 0) score += 5;
+        if (p.fob > 0) score += 5;
+        if (p.barcode) score += 5;
+        if (p.boxBarcode) score += 5;
+        if (p.hscode) score += 5;
+        if (p.exportInfo) score += 10;
+        if (/^(SHI|FB|HB|AC|FG|FP|FT)/i.test(p.id)) score += 20;
+        return { p: p, score: score };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      const winner = scored[0].p;
+      const losers = scored.slice(1).map(x => x.p);
+      losers.forEach(loser => {
+        productsToDelete.add(loser.id);
+        idMapping.set(loser.id, winner.id);
+        mergedCount++;
+      });
+    });
+    let salesUpdated = 0;
+    if (typeof setSales === 'function' && Array.isArray(sales)) {
+      const newSales = sales.map(s => {
+        if (idMapping.has(s.productId)) {
+          salesUpdated++;
+          return Object.assign({}, s, { productId: idMapping.get(s.productId) });
+        }
+        return s;
+      });
+      if (salesUpdated > 0) setSales(newSales);
+    }
+    const newProducts = products.filter(p => !productsToDelete.has(p.id));
+    setProducts(newProducts);
+    syncDB.products(newProducts);
+    showToast('✅ ' + mergedCount + '개 중복 통합 완료! (남은 상품: ' + newProducts.length + '개)', '#15803d');
+  };
+
 
     const confirmImport = mode => {
     if (mode === 'replace') {
@@ -4448,23 +4554,16 @@ function ProductsPage() {
       }
     },
     color: "red",
+    sm: true,
     style: {
-      border: '2px solid #dc2626',
-      opacity: 0.7
+      border: '1px solid #fca5a5',
+      opacity: 0.4,
+      fontSize: 11,
+      padding: '4px 8px',
+      background: '#fef2f2',
+      color: '#991b1b'
     }
-  }, "\u26A0\uFE0F \uC0C1\uD488DB \uCD08\uAE30\uD654 (\uC704\uD5D8)"), editable && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      ...btnStyle('outline', true),
-      cursor: 'pointer'
-    }
-  }, "\uD83D\uDCE4 \uC5D1\uC140 \uC5C5\uB85C\uB4DC", /*#__PURE__*/React.createElement("input", {
-    type: "file",
-    accept: ".xlsx,.xls,.csv",
-    onChange: handleFileImport,
-    style: {
-      display: 'none'
-    }
-  })), /*#__PURE__*/React.createElement("label", {
+  }, "\u26A0\uFE0F \uCD08\uAE30\uD654"), editable && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React./*#__PURE__*/React.createElement("label", {
     style: {
       ...btnStyle('blue', true),
       cursor: 'pointer'
@@ -4493,6 +4592,14 @@ function ProductsPage() {
       display: 'none'
     }
   })), /*#__PURE__*/React.createElement(Btn, {
+    onClick: handleAutoMerge,
+    style: {
+      background: '#0891b2',
+      color: 'white',
+      border: '2px solid #0e7490',
+      fontWeight: 700
+    }
+  }, "\uD83D\uDD04 \uC911\uBCF5 \uD1B5\uD569"), /*#__PURE__*/React.createElement(Btn, {
     onClick: () => {
       setForm({
         id: '',
