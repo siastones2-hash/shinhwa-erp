@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260426-0527 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260426-0534 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -202,8 +202,8 @@ const fromDB = {
     date: r.date,
     partner: r.partner,
     item: r.item || '',
-    billed: r.billed || 0,
-    received: r.received || 0,
+    billed: Math.round(+r.billed || 0),
+    received: Math.round(+r.received || 0),
     note: r.note || ''
   }),
   payment: r => ({
@@ -302,13 +302,13 @@ const toDB = {
     brand: p.brand || '',
     cat: p.cat || '기타',
     sp: p.sp || '',
-    consumer: p.consumer || 0,
-    cost: p.cost || 0,
-    sale: p.sale || 0,
-    fob: p.fob || 0,
-    inbox: p.inbox || 1,
-    safe: p.safe || 0,
-    ship: p.ship || 3000,
+    consumer: Math.round(+p.consumer || 0),
+    cost: Math.round(+p.cost || 0),
+    sale: Math.round(+p.sale || 0),
+    fob: Math.round(+p.fob || 0),
+    inbox: Math.round(+p.inbox || 1),
+    safe: Math.round(+p.safe || 0),
+    ship: Math.round(+p.ship || 3000),
     img: p.img || '',
     status: p.status || 'active'
   }),
@@ -332,8 +332,8 @@ const toDB = {
     date: s.date,
     product_id: s.productId || '',
     type: s.type,
-    qty: s.qty,
-    price: s.price || 0,
+    qty: Math.round(+s.qty || 0),
+    price: Math.round(+s.price || 0),
     partner: s.partner || '',
     note: s.note || ''
   }),
@@ -344,10 +344,10 @@ const toDB = {
     country: s.country || '',
     item: s.item || '',
     product_id: s.productId || '',
-    qty: s.qty || 1,
-    supply: s.supply || 0,
-    vat: s.vat || 0,
-    total: s.total || 0,
+    qty: Math.round(+s.qty || 1),
+    supply: Math.round(+s.supply || 0),
+    vat: Math.round(+s.vat || 0),
+    total: Math.round(+s.total || 0),
     tax_type: s.taxType || '부가세포함',
     collected: s.collected || false,
     doc_no: s.docNo || '',
@@ -359,10 +359,10 @@ const toDB = {
     partner: p.partner,
     item: p.item || '',
     product_id: p.productId || '',
-    qty: p.qty || 1,
-    supply: p.supply || 0,
-    vat: p.vat || 0,
-    total: p.total || 0,
+    qty: Math.round(+p.qty || 1),
+    supply: Math.round(+p.supply || 0),
+    vat: Math.round(+p.vat || 0),
+    total: Math.round(+p.total || 0),
     tax_type: p.taxType || '부가세포함',
     paid: p.paid || false,
     doc_no: p.docNo || '',
@@ -373,8 +373,8 @@ const toDB = {
     date: r.date,
     partner: r.partner,
     item: r.item || '',
-    billed: r.billed || 0,
-    received: r.received || 0,
+    billed: Math.round(+r.billed || 0),
+    received: Math.round(+r.received || 0),
     note: r.note || ''
   }),
   payment: p => ({
@@ -382,8 +382,8 @@ const toDB = {
     date: p.date,
     partner: p.partner,
     item: p.item || '',
-    billed: p.billed || 0,
-    paid: p.paid || 0,
+    billed: Math.round(+p.billed || 0),
+    paid: Math.round(+p.paid || 0),
     note: p.note || ''
   }),
   tax: t => ({
@@ -391,9 +391,9 @@ const toDB = {
     date: t.date,
     buyer: t.buyer,
     item: t.item || '',
-    supply: t.supply || 0,
-    vat: t.vat || 0,
-    total: t.total || 0,
+    supply: Math.round(+t.supply || 0),
+    vat: Math.round(+t.vat || 0),
+    total: Math.round(+t.total || 0),
     type: t.type,
     doc_no: t.docNo || '',
     status: t.status || ''
@@ -410,7 +410,7 @@ const toDB = {
     note: q.note || '',
     doc_no: q.docNo || '',
     items: q.items || [],
-    total: q.total || 0,
+    total: Math.round(+q.total || 0),
     status: q.status || '발행'
   }),
   invoice: i => ({
