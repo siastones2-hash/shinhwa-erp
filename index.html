@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260426-0721 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260427-0202 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -325,6 +325,7 @@ const toDB = {
     brand: p.brand || '',
     cat: p.cat || '기타',
     sp: p.sp || '',
+    barcode: p.barcode || '',
     consumer: Math.round(+p.consumer || 0),
     cost: Math.round(+p.cost || 0),
     sale: Math.round(+p.sale || 0),
@@ -333,7 +334,8 @@ const toDB = {
     safe: Math.round(+p.safe || 0),
     ship: Math.round(+p.ship || 3000),
     img: p.img || '',
-    status: p.status || 'active'
+    status: p.status || 'active',
+    inactive: p.inactive || false
   }),
   buyer: b => ({
     id: b.id,
@@ -3749,13 +3751,15 @@ function ProductsPage() {
     cat: '식품',
     sp: '',
     brand: '',
+    barcode: '',
     consumer: '',
     cost: '',
     sale: '',
     ship: '',
     inbox: '',
     safe: '',
-    useExchange: false
+    useExchange: false,
+    inactive: false
   });
   const editable = canEdit('products');
   const filtered = (() => {
@@ -3793,6 +3797,15 @@ function ProductsPage() {
     if (!form.ko.trim()) {
       showToast('상품명을 입력하세요', '#dc2626');
       return;
+    }
+    // 🛡️ 중복 바코드 방지
+    if (form.barcode && form.barcode.trim()) {
+      const bc = form.barcode.trim();
+      const dupProduct = products.find(x => x.barcode === bc && x.id !== form.id);
+      if (dupProduct) {
+        showToast('⚠️ 이미 사용 중인 바코드입니다! [' + dupProduct.id + '] ' + dupProduct.ko, '#dc2626');
+        return;
+      }
     }
     const p = {
       ...form,
@@ -4610,13 +4623,15 @@ function ProductsPage() {
         cat: '식품',
         sp: '',
         brand: '',
+        barcode: '',
         consumer: '',
         cost: '',
         sale: '',
         ship: '',
         inbox: '',
         safe: '',
-        useExchange: false
+        useExchange: false,
+        inactive: false
       });
       setModal(true);
     }
@@ -5177,13 +5192,21 @@ function ProductsPage() {
     placeholder: "Pokpoong Tteokbokki Cup"
   }))), /*#__PURE__*/React.createElement(FG, {
     label: "\uBE0C\uB79C\uB4DC"
+  }, /*#__PURE__*/React.createElement("input", {
+    value: form.brand || '',
+    onChange: e => setForm(f => ({...f, brand: e.target.value})),
+    placeholder: "\uD3ED\uD48D\uB5A1\uBCF6\uC774",
+    list: "brand-suggestions",
+    style: inp,
+    autoComplete: "off"
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "brand-suggestions"
+  }, [...new Set(products.map(p => p.brand).filter(Boolean))].sort().map(b => /*#__PURE__*/React.createElement("option", { key: b, value: b })))), /*#__PURE__*/React.createElement(FG, {
+    label: "\uBC14\uCF54\uB4DC (\uC120\uD0DD)"
   }, /*#__PURE__*/React.createElement(Input, {
-    value: form.brand,
-    onChange: v => setForm(f => ({
-      ...f,
-      brand: v
-    })),
-    placeholder: "\uD3ED\uD48D\uB5A1\uBCF6\uC774"
+    value: form.barcode || '',
+    onChange: v => setForm(f => ({...f, barcode: v})),
+    placeholder: "8801234567890"
   })), /*#__PURE__*/React.createElement(FG, {
     label: "\uC18C\uBE44\uC790\uAC00"
   }, /*#__PURE__*/React.createElement(Input, {
@@ -5259,6 +5282,15 @@ function ProductsPage() {
   }), /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDCB1"), "\uD658\uC728 \uC801\uC6A9 (\uC218\uCD9C\uC6A9)"), /*#__PURE__*/React.createElement("div", {
     style: { fontSize: 12, color: form.useExchange ? '#1e40af' : '#6b7280', marginTop: 6, marginLeft: 28 }
   }, form.useExchange ? "\u2705 \uD658\uC728 \uC801\uC6A9 (USD \uAC00\uACA9 \uC790\uB3D9 \uACC4\uC0B0)" : "\u274C \uD658\uC728 \uBBF8\uC801\uC6A9 (\uD55C\uAD6D \uAC70\uB798\uC6A9 - \uC6D0\uD654\uB9CC)"))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
+    label: "\uC0AC\uC6A9 \uC5EC\uBD80"
+  }, /*#__PURE__*/React.createElement("label", {
+    style: { display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14, fontWeight: 600, padding: 12, background: form.inactive ? '#fef2f2' : '#f0fdf4', borderRadius: 8, border: form.inactive ? '2px solid #fca5a5' : '2px solid #86efac' }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: form.inactive || false,
+    onChange: e => setForm(f => ({...f, inactive: e.target.checked})),
+    style: { width: 18, height: 18, cursor: 'pointer' }
+  }), /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, form.inactive ? "\uD83D\uDEAB" : "\u2705"), form.inactive ? "\uC0AC\uC6A9 \uC548\uD568 (\uAC80\uC0C9 \uBAA9\uB85D \uC81C\uC678)" : "\uC0AC\uC6A9 \uC911 (\uAC80\uC0C9 \uBAA9\uB85D \uD45C\uC2DC)"))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uC774\uBBF8\uC9C0 URL (\uC120\uD0DD)"
   }, /*#__PURE__*/React.createElement(Input, {
     value: form.img || '',
@@ -6423,6 +6455,24 @@ function BuyerSelect({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    value: filterBrand,
+    onChange: e => setFilterBrand(e.target.value),
+    style: { ...inp, fontSize: 12, flex: 1, padding: '6px 8px' }
+  }, /*#__PURE__*/React.createElement("option", { value: '' }, "\uD83C\uDFF7\uFE0F \uC804\uCCB4 \uBE0C\uB79C\uB4DC"), allBrands.map(b => /*#__PURE__*/React.createElement("option", { key: b, value: b }, b))), /*#__PURE__*/React.createElement("select", {
+    value: filterCat,
+    onChange: e => setFilterCat(e.target.value),
+    style: { ...inp, fontSize: 12, flex: 1, padding: '6px 8px' }
+  }, /*#__PURE__*/React.createElement("option", { value: '' }, "\uD83D\uDCC2 \uC804\uCCB4 \uCE74\uD14C\uACE0\uB9AC"), allCats.map(c => /*#__PURE__*/React.createElement("option", { key: c, value: c }, c))), (filterBrand || filterCat || query) && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onMouseDown: e => { e.preventDefault(); setFilterBrand(''); setFilterCat(''); setQuery(''); onChange(''); },
+    style: { background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 6, padding: '6px 10px', cursor: 'pointer', color: '#991b1b', fontSize: 11, fontWeight: 600 }
+  }, "\u2715 \uCD08\uAE30\uD654")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
       gap: 6
     }
   }, /*#__PURE__*/React.createElement("input", {
@@ -6522,13 +6572,29 @@ function ProductSelect({
   placeholder = '상품명 입력 또는 목록에서 선택'
 }) {
   const {
-    products
+    products,
+    getStock
   } = useAuth();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value || '');
+  const [filterBrand, setFilterBrand] = useState('');
+  const [filterCat, setFilterCat] = useState('');
   const ref = useState(null);
-  const allFiltered = query ? products.filter(p => (p.ko || '').includes(query) || (p.en || '').toLowerCase().includes(query.toLowerCase()) || (p.brand || '').includes(query)) : products;
-  const filtered = allFiltered.slice(0, 100);
+  // 안전성: products가 undefined여도 빈 배열로 처리
+  const safeProducts = Array.isArray(products) ? products : [];
+  // 사용 안함 상품 필터링 + 최근 등록순 정렬 (id 역순)
+  const activeProducts = safeProducts.filter(p => p && !p.inactive).sort((a, b) => (b.id || '').localeCompare(a.id || ''));
+  // 브랜드/카테고리 옵션 추출 (중복 제거 + 정렬)
+  const allBrands = [...new Set(activeProducts.map(p => p.brand).filter(Boolean))].sort();
+  const allCats = [...new Set(activeProducts.map(p => p.cat).filter(Boolean))].sort();
+  // 브랜드/카테고리 필터 적용
+  let preFiltered = activeProducts;
+  if (filterBrand) preFiltered = preFiltered.filter(p => p.brand === filterBrand);
+  if (filterCat) preFiltered = preFiltered.filter(p => p.cat === filterCat);
+  // 텍스트 검색 (한글명/영문명/브랜드/코드/바코드)
+  const allFiltered = query ? preFiltered.filter(p => (p.ko || '').includes(query) || (p.en || '').toLowerCase().includes(query.toLowerCase()) || (p.brand || '').includes(query) || (p.id || '').toLowerCase().includes(query.toLowerCase()) || (p.barcode || '').includes(query)) : preFiltered;
+  // 검색어 있으면 매칭되는 모든 결과 (최대 500개), 검색어 없으면 100개
+  const filtered = query ? allFiltered.slice(0, 500) : allFiltered.slice(0, 100);
   const handleInput = v => {
     setQuery(v);
     onChange(v);
@@ -6545,6 +6611,24 @@ function ProductSelect({
       position: 'relative'
     }
   }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    value: filterBrand,
+    onChange: e => setFilterBrand(e.target.value),
+    style: { ...inp, fontSize: 12, flex: 1, padding: '6px 8px' }
+  }, /*#__PURE__*/React.createElement("option", { value: '' }, "\uD83C\uDFF7\uFE0F \uC804\uCCB4 \uBE0C\uB79C\uB4DC"), allBrands.map(b => /*#__PURE__*/React.createElement("option", { key: b, value: b }, b))), /*#__PURE__*/React.createElement("select", {
+    value: filterCat,
+    onChange: e => setFilterCat(e.target.value),
+    style: { ...inp, fontSize: 12, flex: 1, padding: '6px 8px' }
+  }, /*#__PURE__*/React.createElement("option", { value: '' }, "\uD83D\uDCC2 \uC804\uCCB4 \uCE74\uD14C\uACE0\uB9AC"), allCats.map(c => /*#__PURE__*/React.createElement("option", { key: c, value: c }, c))), (filterBrand || filterCat || query) && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onMouseDown: e => { e.preventDefault(); setFilterBrand(''); setFilterCat(''); setQuery(''); onChange(''); },
+    style: { background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 6, padding: '6px 10px', cursor: 'pointer', color: '#991b1b', fontSize: 11, fontWeight: 600 }
+  }, "\u2715 \uCD08\uAE30\uD654")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 6
@@ -6597,7 +6681,16 @@ function ProductSelect({
       background: '#f8fafc',
       borderBottom: '1px solid #e2e8f0'
     }
-  }, "\uD83D\uDD0D \uC0C1\uD488\uBA85/\uBE0C\uB79C\uB4DC \uAC80\uC0C9 \uC2DC \uC804\uCCB4 ", products.length, "\uAC1C \uC870\uD68C \uAC00\uB2A5 (\uD604\uC7AC \uC0C1\uC704 100\uAC1C)"), filtered.map(p => /*#__PURE__*/React.createElement("div", {
+  }, (() => {
+    const filterText = (filterBrand || filterCat) ? ((filterBrand ? '\uBE0C\uB79C\uB4DC[' + filterBrand + ']' : '') + (filterCat ? ' \uCE74\uD14C\uACE0\uB9AC[' + filterCat + ']' : '') + ' \uD544\uD130 \uC801\uC6A9 - ') : '';
+    if (query) {
+      return "\uD83D\uDD0D " + filterText + "\uAC80\uC0C9 \uACB0\uACFC: " + allFiltered.length + "\uAC1C" + (allFiltered.length > 500 ? " (\uC0C1\uC704 500\uAC1C \uD45C\uC2DC)" : "");
+    } else if (filterBrand || filterCat) {
+      return "\uD83C\uDFF7\uFE0F " + filterText + preFiltered.length + "\uAC1C";
+    } else {
+      return "\uD83D\uDD0D \uC774\uB984/\uBE0C\uB79C\uB4DC/\uCF54\uB4DC/\uBC14\uCF54\uB4DC \uAC80\uC0C9 (\uC804\uCCB4 " + activeProducts.length + "\uAC1C \uC911 \uC0C1\uC704 100\uAC1C)";
+    }
+  })()), filtered.map(p => /*#__PURE__*/React.createElement("div", {
     key: p.id,
     onMouseDown: () => handleSelect(p),
     style: {
@@ -6642,7 +6735,17 @@ function ProductSelect({
       fontSize: 10,
       color: '#94a3b8'
     }
-  }, "\uC6D0\uAC00 ", won(p.cost)))))));
+  }, "\uC6D0\uAC00 ", won(p.cost)), (() => {
+    const stock = getStock(p.id);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        fontWeight: 600,
+        color: stock <= 0 ? '#dc2626' : stock <= (p.safe || 0) ? '#ea580c' : '#1d4ed8',
+        marginTop: 2
+      }
+    }, "\uC7AC\uACE0: ", stock, "\uAC1C");
+  })())))));
 }
 function SalesPage() {
   const {
@@ -7473,14 +7576,22 @@ function SalesPage() {
     onSelect: handleProductSelect,
     placeholder: "\uC0C1\uD488\uBA85 \uC785\uB825 \uB610\uB294 \uBAA9\uB85D\uC5D0\uC11C \uC120\uD0DD"
   }), form.productId && (() => {
-    const cur = stocks.filter(s => s.productId === form.productId && s.type === 'in').reduce((a, s) => a + (s.qty || 0), 0) - stocks.filter(s => s.productId === form.productId && s.type === 'out').reduce((a, s) => a + (s.qty || 0), 0);
+    const cur = getStock(form.productId);
+    const prod = products.find(x => x.id === form.productId);
+    const safe = prod ? (prod.safe || 0) : 0;
+    const lowStock = cur <= safe;
     return /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 11,
-        marginTop: 3,
-        color: cur > 0 ? '#15803d' : '#dc2626'
+        marginTop: 6,
+        padding: '8px 12px',
+        background: cur <= 0 ? '#fef2f2' : lowStock ? '#fff7ed' : '#f0fdf4',
+        border: cur <= 0 ? '2px solid #dc2626' : lowStock ? '2px solid #ea580c' : '2px solid #86efac',
+        borderRadius: 6,
+        fontSize: 13,
+        fontWeight: 600,
+        color: cur <= 0 ? '#991b1b' : lowStock ? '#9a3412' : '#15803d'
       }
-    }, "\uD83D\uDCE6 \uD604\uC7AC\uACE0: ", /*#__PURE__*/React.createElement("strong", null, cur, "\uAC1C"), cur <= 0 ? ' (재고없음)' : '');
+    }, "\uD83D\uDCE6 \uAC00\uC6A9 \uC7AC\uACE0: ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 16, fontWeight: 800 } }, cur, "\uAC1C"), cur <= 0 ? ' \u26A0\uFE0F \uC7AC\uACE0\uC5C6\uC74C!' : lowStock ? ' \u26A0\uFE0F \uC548\uC804\uC7AC\uACE0 \uC774\uD558' : '');
   })(), form.partner && form.item && getLastPrice(form.partner, form.item) && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
