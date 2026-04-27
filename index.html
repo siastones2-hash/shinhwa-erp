@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260427-0420 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260427-0445 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -4722,12 +4722,16 @@ function ProductsPage() {
     value: search,
     onChange: e => setSearch(e.target.value),
     placeholder: "\uD83D\uDD0D \uC0C1\uD488\uBA85(\uD55C/\uC601),\uBE0C\uB79C\uB4DC,\uCF54\uB4DC,\uADDC\uACA9 \uAC80\uC0C9...",
+    list: "products-page-suggestions",
+    autoComplete: "off",
     style: {
       ...inp,
       flex: 2,
       minWidth: 200
     }
-  }), /*#__PURE__*/React.createElement("select", {
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "products-page-suggestions"
+  }, products.filter(p => !p.inactive).slice(0, 500).map(p => /*#__PURE__*/React.createElement("option", { key: p.id, value: p.ko }, p.brand ? '[' + p.brand + '] ' + (p.id || '') : ''))), /*#__PURE__*/React.createElement("select", {
     value: catFilter,
     onChange: e => setCatFilter(e.target.value),
     style: {
@@ -5707,11 +5711,15 @@ function StockPage() {
     value: bulkSearch,
     onChange: e => setBulkSearch(e.target.value),
     placeholder: "\uD83D\uDD0D \uC0C1\uD488 \uAC80\uC0C9...",
+    list: "stock-product-suggestions",
+    autoComplete: "off",
     style: {
       ...inp2style,
       width: 160
     }
-  }), /*#__PURE__*/React.createElement(Btn, {
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "stock-product-suggestions"
+  }, products.filter(p => !p.inactive).slice(0, 500).map(p => /*#__PURE__*/React.createElement("option", { key: p.id, value: p.ko }, p.brand ? '[' + p.brand + '] ' + (p.id || '') : ''))), /*#__PURE__*/React.createElement(Btn, {
     onClick: saveBulk,
     color: "blue"
   }, "\u2705 \uC800\uC7A5 (", bulkRows.filter(r => r.qty && +r.qty > 0).length, "\uAC1C)"), /*#__PURE__*/React.createElement("button", {
@@ -7255,11 +7263,15 @@ function SalesPage() {
     value: itemSearch || '',
     onChange: e => setItemSearch(e.target.value),
     placeholder: "\uD83D\uDCE6 \uD488\uBAA9\uBA85 \uAC80\uC0C9...",
+    list: "sales-product-suggestions",
+    autoComplete: "off",
     style: {
       ...inp2style,
       width: '100%'
     }
-  })), /*#__PURE__*/React.createElement("input", {
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "sales-product-suggestions"
+  }, products.filter(p => !p.inactive).slice(0, 500).map(p => /*#__PURE__*/React.createElement("option", { key: p.id, value: p.ko }, p.brand ? '[' + p.brand + '] ' + (p.sp || '') : '')))), /*#__PURE__*/React.createElement("input", {
     type: "date",
     value: dateFrom,
     onChange: e => setDateFrom(e.target.value),
@@ -8149,12 +8161,16 @@ function PurchasePage() {
     value: itemSearch || '',
     onChange: e => setItemSearch(e.target.value),
     placeholder: "\uD83D\uDCE6 \uD488\uBAA9\uBA85 \uAC80\uC0C9...",
+    list: "purchase-product-suggestions",
+    autoComplete: "off",
     style: {
       ...inp2style,
       flex: 1,
       minWidth: 120
     }
-  }), /*#__PURE__*/React.createElement("input", {
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "purchase-product-suggestions"
+  }, products.filter(p => !p.inactive).slice(0, 500).map(p => /*#__PURE__*/React.createElement("option", { key: p.id, value: p.ko }, p.brand ? '[' + p.brand + '] ' + (p.sp || '') : ''))), /*#__PURE__*/React.createElement("input", {
     type: "date",
     value: dateFrom,
     onChange: e => setDateFrom(e.target.value),
@@ -13765,11 +13781,15 @@ function QuotePage() {
     value: search,
     onChange: e => setSearch(e.target.value),
     placeholder: "\uD83D\uDD0D \uC0C1\uD488\uBA85, \uBE0C\uB79C\uB4DC \uAC80\uC0C9...",
+    list: "quote-product-suggestions",
+    autoComplete: "off",
     style: {
       ...inp,
       fontSize: 12
     }
-  })), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "quote-product-suggestions"
+  }, products.filter(p => !p.inactive).slice(0, 500).map(p => /*#__PURE__*/React.createElement("option", { key: p.id, value: p.ko }, p.brand ? '[' + p.brand + '] ' + (p.id || '') : '')))), /*#__PURE__*/React.createElement("div", {
     style: {
       maxHeight: 580,
       overflowY: 'auto'
