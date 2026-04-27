@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260427-0445 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260427-0514 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -5169,14 +5169,16 @@ function ProductsPage() {
     }))
   }, /*#__PURE__*/React.createElement("option", null, "\uC2DD\uD488"), /*#__PURE__*/React.createElement("option", null, "\uD654\uC7A5\uD488"), /*#__PURE__*/React.createElement("option", null, "\uAC74\uAC15\uAE30\uB2A5\uC2DD\uD488"), /*#__PURE__*/React.createElement("option", null, "\uC0DD\uD65C\uC6A9\uD488"), /*#__PURE__*/React.createElement("option", null, "\uC7A1\uD654"), /*#__PURE__*/React.createElement("option", null, "\uAE30\uD0C0"))), /*#__PURE__*/React.createElement(FG, {
     label: "\uADDC\uACA9/\uC6A9\uB7C9"
-  }, /*#__PURE__*/React.createElement(Input, {
-    value: form.sp,
-    onChange: v => setForm(f => ({
-      ...f,
-      sp: v
-    })),
-    placeholder: "175g"
-  })), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
+  }, /*#__PURE__*/React.createElement("input", {
+    value: form.sp || '',
+    onChange: e => setForm(f => ({...f, sp: e.target.value})),
+    placeholder: "175g \uB610\uB294 \uBC15\uC2A4/\uAC1C/\uC138\uD2B8/ea/kg",
+    list: "unit-suggestions",
+    autoComplete: "off",
+    style: inp
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "unit-suggestions"
+  }, [...new Set(products.map(p => p.sp).filter(Boolean))].sort().concat(['\uBC15\uC2A4', '\uAC1C', '\uC138\uD2B8', 'ea', 'kg', 'g', 'ml', 'L', '\uD30C\uC6B0\uCE58', '\uCEF5']).map(u => /*#__PURE__*/React.createElement("option", { key: u, value: u })))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uC0C1\uD488\uBA85(\uAD6D\uBB38) *"
   }, /*#__PURE__*/React.createElement(Input, {
     value: form.ko,
@@ -14540,12 +14542,23 @@ function MyPage() {
     showToast,
     syncDB,
     sales,
+    setSales,
     purchases,
+    setPurchases,
     stocks,
+    setStocks,
     receipts,
+    setReceipts,
     payments,
+    setPayments,
     taxInvoices,
+    setTaxInvoices,
     quotes,
+    setQuotes,
+    invoices,
+    setInvoices,
+    approvals,
+    setApprovals,
     buyers,
     products,
     schedules
@@ -14618,6 +14631,69 @@ function MyPage() {
       if (timer) clearTimeout(timer);
     };
   }, []);
+  
+  // 거래 데이터 초기화 (관리자 전용)
+  const resetTransactions = () => {
+    if (user.role !== 'ceo' && user.role !== 'admin' && user.role !== 'vice') {
+      showToast('관리자만 사용 가능합니다', '#dc2626');
+      return;
+    }
+    const inputPw = prompt('⚠️ 거래 데이터를 모두 삭제합니다.\n\n현재 비밀번호를 입력하세요:');
+    if (!inputPw) return;
+    if (inputPw !== user.pw) {
+      showToast('비밀번호가 틀립니다', '#dc2626');
+      return;
+    }
+    const confirmText = prompt('정말 초기화하시겠습니까?\n\n삭제: 매출/매입/수금/지급/세금계산서/재고/결재/견적서/인보이스\n보존: 상품/거래처/단가/직원/스케줄\n\n계속하려면 "초기화" 라고 입력:');
+    if (confirmText !== '초기화') {
+      showToast('초기화 취소되었습니다');
+      return;
+    }
+    const backup = {
+      version: '3.0',
+      exportedAt: new Date().toISOString(),
+      exportedBy: user.name + ' (초기화 직전)',
+      data: {
+        sales: sales || [], purchases: purchases || [], stocks: stocks || [],
+        receipts: receipts || [], payments: payments || [], taxInvoices: taxInvoices || [],
+        quotes: quotes || [], invoices: invoices || [], approvals: approvals || [],
+        products: products || [], buyers: buyers || [], users: users || [], schedules: schedules || []
+      }
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '신화ERP_초기화전백업_' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    setSales([]);
+    setPurchases([]);
+    setStocks([]);
+    setReceipts([]);
+    setPayments([]);
+    setTaxInvoices([]);
+    setQuotes([]);
+    if (setInvoices) setInvoices([]);
+    if (setApprovals) setApprovals([]);
+    if (syncDB) {
+      try {
+        if (syncDB.sales) syncDB.sales([]);
+        if (syncDB.purchases) syncDB.purchases([]);
+        if (syncDB.stocks) syncDB.stocks([]);
+        if (syncDB.receipts) syncDB.receipts([]);
+        if (syncDB.payments) syncDB.payments([]);
+        if (syncDB.taxInvoices) syncDB.taxInvoices([]);
+        if (syncDB.quotes) syncDB.quotes([]);
+        if (syncDB.invoices) syncDB.invoices([]);
+        if (syncDB.approvals) syncDB.approvals([]);
+      } catch(e) {
+        console.error('Supabase 동기화:', e);
+      }
+    }
+    showToast('✅ 거래 데이터 초기화 완료! 백업 파일이 다운로드되었습니다.');
+  };
+  
   const exportAll = () => {
     const data = {
       products,
@@ -14981,7 +15057,17 @@ function MyPage() {
     },
     color: "outline",
     style: { flex: 1, minWidth: 140, justifyContent: 'center' }
-  }, "\uD83D\uDCE4 \uBC31\uC5C5\uC5D0\uC11C \uBCF5\uC6D0")))))));
+  }, "\uD83D\uDCE4 \uBC31\uC5C5\uC5D0\uC11C \uBCF5\uC6D0")))), (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement("div", {
+    style: { background: '#fff', borderRadius: 12, padding: 20, marginTop: 16, border: '2px solid #fca5a5' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 16, fontWeight: 700, color: '#991b1b' }
+  }, "\u26A0\uFE0F ", "\uAC70\uB798 \uB370\uC774\uD130 \uCD08\uAE30\uD654 (\uAD00\uB9AC\uC790 \uC804\uC6A9)"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, color: '#7f1d1d', marginBottom: 12, lineHeight: 1.6, padding: 12, background: '#fef2f2', borderRadius: 8 }
+  }, "\u274C \uC0AD\uC81C: \uB9E4\uCD9C/\uB9E4\uC785/\uC218\uAE08/\uC9C0\uAE09/\uC138\uAE08\uACC4\uC0B0\uC11C/\uC7AC\uACE0/\uACB0\uC7AC/\uACAC\uC801\uC11C/\uC778\uBCF4\uC774\uC2A4", /*#__PURE__*/React.createElement("br"), "\u2705 \uBCF4\uC874: \uC0C1\uD488/\uAC70\uB798\uCC98/\uB2E8\uAC00/\uC9C1\uC6D0/\uC2A4\uCF00\uC904/\uD658\uC728", /*#__PURE__*/React.createElement("br"), /*#__PURE__*/React.createElement("strong", null, "\uD83D\uDCBE \uCD08\uAE30\uD654 \uC2DC \uC790\uB3D9\uC73C\uB85C \uBC31\uC5C5 \uD30C\uC77C\uC774 \uB2E4\uC6B4\uB85C\uB4DC\uB429\uB2C8\uB2E4.")), /*#__PURE__*/React.createElement(Btn, {
+    onClick: resetTransactions,
+    color: "red",
+    style: { width: '100%', justifyContent: 'center' }
+  }, "\uD83D\uDDD1\uFE0F \uAC70\uB798 \uB370\uC774\uD130 \uC804\uCCB4 \uCD08\uAE30\uD654")))));
 }
 function HelpPage() {
   const ctx = useAuth();
