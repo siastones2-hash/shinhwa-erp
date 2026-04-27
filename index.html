@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260427-0202 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260427-0420 - MD5체크용');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -6453,24 +6453,6 @@ function BuyerSelect({
       position: 'relative'
     }
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 6,
-      marginBottom: 6
-    }
-  }, /*#__PURE__*/React.createElement("select", {
-    value: filterBrand,
-    onChange: e => setFilterBrand(e.target.value),
-    style: { ...inp, fontSize: 12, flex: 1, padding: '6px 8px' }
-  }, /*#__PURE__*/React.createElement("option", { value: '' }, "\uD83C\uDFF7\uFE0F \uC804\uCCB4 \uBE0C\uB79C\uB4DC"), allBrands.map(b => /*#__PURE__*/React.createElement("option", { key: b, value: b }, b))), /*#__PURE__*/React.createElement("select", {
-    value: filterCat,
-    onChange: e => setFilterCat(e.target.value),
-    style: { ...inp, fontSize: 12, flex: 1, padding: '6px 8px' }
-  }, /*#__PURE__*/React.createElement("option", { value: '' }, "\uD83D\uDCC2 \uC804\uCCB4 \uCE74\uD14C\uACE0\uB9AC"), allCats.map(c => /*#__PURE__*/React.createElement("option", { key: c, value: c }, c))), (filterBrand || filterCat || query) && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onMouseDown: e => { e.preventDefault(); setFilterBrand(''); setFilterCat(''); setQuery(''); onChange(''); },
-    style: { background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 6, padding: '6px 10px', cursor: 'pointer', color: '#991b1b', fontSize: 11, fontWeight: 600 }
-  }, "\u2715 \uCD08\uAE30\uD654")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 6
