@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260519-1319 - MD5체크용');
+console.log('🚀 신화ERP v3 - 빌드: 20260619-worklog-cloud');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -322,6 +322,14 @@ const fromDB = {
   worklog: r => {
     const d = r.data && typeof r.data === 'object' ? r.data : {};
     return { ...d, id: Number(r.id) || d.id || Date.now() };
+  },
+  worklogSchedule: r => {
+    try {
+      const parsed = JSON.parse(r.memo || '{}');
+      return { ...parsed, id: Number(r.id) || parsed.id || Date.now() };
+    } catch {
+      return { id: Number(r.id), title: r.title || '', date: r.date || '' };
+    }
   }
 };
 
@@ -503,7 +511,23 @@ const toDB = {
     id: item.id,
     module,
     data: item
-  })
+  }),
+  worklogSchedule: (module, item) => {
+    const title = item.title || item.subject || item.name || item.product || String(module);
+    const date = item.date || item.meetingDate || todayStr();
+    return {
+      id: item.id,
+      date,
+      title: String(title).slice(0, 200),
+      type: 'WL:' + module,
+      partner: '',
+      assignee: item.assignee || item.writer || '',
+      memo: JSON.stringify(item),
+      status: item.status || '완료',
+      priority: '보통',
+      created_by: item.createdBy || item.writer || ''
+    };
+  }
 };
 const LS = {
   get: (k, d) => {
@@ -565,6 +589,27 @@ const WORKLOG_STATE_KEYS = {
   order: 'prodorders',
   monthly: 'monthly',
   grant: 'grants'
+};
+const isWorklogScheduleRow = r => (r.type || '').startsWith('WL:');
+const worklogModuleFromRow = r => isWorklogScheduleRow(r) ? r.type.slice(3) : null;
+const splitSchedulesRows = rows => {
+  const schedules = [];
+  const worklogs = { meetings: [], proddevs: [], prodorders: [], monthly: [], grants: [] };
+  (rows || []).forEach(r => {
+    if (isWorklogScheduleRow(r)) {
+      const mod = worklogModuleFromRow(r);
+      const sk = WORKLOG_STATE_KEYS[mod];
+      if (sk) worklogs[sk].push(fromDB.worklogSchedule(r));
+    } else {
+      schedules.push(fromDB.schedule(r));
+    }
+  });
+  return { schedules, worklogs };
+};
+const persistWorklogsToLS = grouped => {
+  Object.entries(WORKLOG_LS_KEYS).forEach(([mod, lsKey]) => {
+    LS.set(lsKey, grouped[WORKLOG_STATE_KEYS[mod]] || []);
+  });
 };
 const loadWorklogsFromLS = () => ({
   meetings: LS.get(WORKLOG_LS_KEYS.meeting, LS.get(WORKLOG_LEGACY_KEYS.meeting, [])),
@@ -2090,7 +2135,10 @@ function App() {
         if (tx.length > 0) setTaxInvoices(tx.map(fromDB.tax));
         if (qu.length > 0) setQuotes(qu.map(fromDB.quote));
         if (inv.length > 0) setInvoices(inv.map(fromDB.invoice));
-        if (sc.length > 0) setSchedules(sc.map(fromDB.schedule));
+        if (sc.length > 0) {
+          const split = splitSchedulesRows(sc);
+          if (split.schedules.length > 0) setSchedules(split.schedules);
+        }
         if (pl.length > 0) {
           setPricelist(pl.map(fromDB.pricelist));
         } else if (INIT_PRICELIST.length > 0) {
@@ -2120,18 +2168,29 @@ function App() {
                 else if (r.module === 'grant') grouped.grants.push(item);
               });
               setWorklogs(grouped);
-              Object.entries(WORKLOG_LS_KEYS).forEach(([mod, lsKey]) => {
-                LS.set(lsKey, grouped[WORKLOG_STATE_KEYS[mod]]);
-              });
+              persistWorklogsToLS(grouped);
             } else {
               const local = loadWorklogsFromLS();
               const hasLocal = Object.values(local).some(a => a.length > 0);
-              if (hasLocal) {
-                setWorklogs(local);
-              }
+              if (hasLocal) setWorklogs(local);
             }
           } else {
-            setWorklogCloudOk(false);
+            const schedProbe = await fetch(`${SUPABASE_URL}/rest/v1/erp_schedules?select=id&limit=1`, { headers: sb.headers });
+            if (schedProbe.ok) {
+              setWorklogCloudOk(true);
+              const scAll = sc.length > 0 ? sc : await safeGet('erp_schedules');
+              const split = splitSchedulesRows(scAll);
+              const hasCloud = Object.values(split.worklogs).some(a => a.length > 0);
+              if (hasCloud) {
+                setWorklogs(split.worklogs);
+                persistWorklogsToLS(split.worklogs);
+              } else {
+                const local = loadWorklogsFromLS();
+                if (Object.values(local).some(a => a.length > 0)) setWorklogs(local);
+              }
+            } else {
+              setWorklogCloudOk(false);
+            }
           }
         } catch (e) {
           setWorklogCloudOk(false);
@@ -2187,8 +2246,16 @@ function App() {
       conv: fromDB.quote
     }, {
       name: 'erp_schedules',
-      setter: setSchedules,
-      conv: fromDB.schedule
+      setter: data => {
+        const split = splitSchedulesRows(data);
+        if (split.schedules.length > 0) setSchedules(split.schedules);
+        if (Object.values(split.worklogs).some(a => a.length > 0)) {
+          setWorklogs(split.worklogs);
+          persistWorklogsToLS(split.worklogs);
+          setWorklogCloudOk(true);
+        }
+      },
+      conv: r => r
     }, {
       name: 'erp_buyers',
       setter: setBuyers,
@@ -2243,7 +2310,15 @@ function App() {
         if (re.length > 0) setReceipts(re.map(fromDB.receipt));
         if (pa.length > 0) setPayments(pa.map(fromDB.payment));
         if (qu.length > 0) setQuotes(qu.map(fromDB.quote));
-        if (sc.length > 0) setSchedules(sc.map(fromDB.schedule));
+        if (sc.length > 0) {
+          const split = splitSchedulesRows(sc);
+          if (split.schedules.length > 0) setSchedules(split.schedules);
+          if (Object.values(split.worklogs).some(a => a.length > 0)) {
+            setWorklogs(split.worklogs);
+            persistWorklogsToLS(split.worklogs);
+            setWorklogCloudOk(true);
+          }
+        }
       } catch (err) { console.error(err); }
     }, 30000);
     return () => {
@@ -2480,14 +2555,28 @@ function App() {
     },
     worklogsModule: async (module, items) => {
       try {
-        await fetch(`${SUPABASE_URL}/rest/v1/erp_worklogs?module=eq.${encodeURIComponent(module)}`, {
+        const wlProbe = await fetch(`${SUPABASE_URL}/rest/v1/erp_worklogs?select=id&limit=1`, { headers: sb.headers });
+        if (wlProbe.ok) {
+          await fetch(`${SUPABASE_URL}/rest/v1/erp_worklogs?module=eq.${encodeURIComponent(module)}`, {
+            method: 'DELETE',
+            headers: sb.headers
+          });
+          if (!items || items.length === 0) return true;
+          const rows = items.map(item => toDB.worklog(module, item));
+          for (let i = 0; i < rows.length; i += 100) {
+            await sb.upsert('erp_worklogs', rows.slice(i, i + 100));
+          }
+          return true;
+        }
+        const wlType = 'WL:' + module;
+        await fetch(`${SUPABASE_URL}/rest/v1/erp_schedules?type=eq.${encodeURIComponent(wlType)}`, {
           method: 'DELETE',
           headers: sb.headers
         });
         if (!items || items.length === 0) return true;
-        const rows = items.map(item => toDB.worklog(module, item));
+        const rows = items.map(item => toDB.worklogSchedule(module, item));
         for (let i = 0; i < rows.length; i += 100) {
-          await sb.upsert('erp_worklogs', rows.slice(i, i + 100));
+          await sb.upsert('erp_schedules', rows.slice(i, i + 100));
         }
         return true;
       } catch (e) {
@@ -2498,7 +2587,11 @@ function App() {
     delWorklog: async id => {
       try {
         await sb.delete('erp_worklogs', id);
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        try {
+          await sb.delete('erp_schedules', id);
+        } catch (e2) { console.error(e2); }
+      }
     }
   };
   const worklogMigratedRef = React.useRef(false);
@@ -2506,10 +2599,20 @@ function App() {
     if (!user || !dbReady || !worklogCloudOk || worklogMigratedRef.current) return;
     (async () => {
       try {
-        const wl = await sb.get('erp_worklogs');
-        if (wl.length > 0) {
-          worklogMigratedRef.current = true;
-          return;
+        const wlProbe = await fetch(`${SUPABASE_URL}/rest/v1/erp_worklogs?select=id&limit=1`, { headers: sb.headers });
+        if (wlProbe.ok) {
+          const wl = await sb.get('erp_worklogs');
+          if (wl.length > 0) {
+            worklogMigratedRef.current = true;
+            return;
+          }
+        } else {
+          const scAll = await sb.get('erp_schedules');
+          const wlRows = scAll.filter(isWorklogScheduleRow);
+          if (wlRows.length > 0) {
+            worklogMigratedRef.current = true;
+            return;
+          }
         }
         let uploaded = 0;
         for (const mod of Object.keys(WORKLOG_STATE_KEYS)) {
@@ -16421,7 +16524,7 @@ function WorkLogPage() {
           background: worklogCloudOk ? '#dcfce7' : '#fef3c7',
           color: worklogCloudOk ? '#15803d' : '#92400e'
         }
-      }, worklogCloudOk ? '☁️ 클라우드 동기화 ON' : '💾 로컬 저장 (SQL 설정 필요)')
+      }, worklogCloudOk ? '☁️ 클라우드 동기화 ON' : '💾 로컬 저장 (오프라인)')
     ),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' } },
       tabs.map(t => /*#__PURE__*/React.createElement("button", {
