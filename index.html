@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260619-worklog-cloud');
+console.log('🚀 신화ERP v3 - 빌드: 20260619-schedule-fix');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -591,6 +591,8 @@ const WORKLOG_STATE_KEYS = {
   grant: 'grants'
 };
 const isWorklogScheduleRow = r => (r.type || '').startsWith('WL:');
+const isWorklogScheduleItem = s => (s?.type || '').startsWith('WL:');
+const filterRealSchedules = list => (list || []).filter(s => !isWorklogScheduleItem(s));
 const worklogModuleFromRow = r => isWorklogScheduleRow(r) ? r.type.slice(3) : null;
 const splitSchedulesRows = rows => {
   const schedules = [];
@@ -605,6 +607,16 @@ const splitSchedulesRows = rows => {
     }
   });
   return { schedules, worklogs };
+};
+const applyScheduleSplit = (rows, setSchedulesFn, setWorklogsFn, markCloud) => {
+  const split = splitSchedulesRows(rows);
+  setSchedulesFn(split.schedules);
+  if (Object.values(split.worklogs).some(a => a.length > 0)) {
+    setWorklogsFn(split.worklogs);
+    persistWorklogsToLS(split.worklogs);
+    if (markCloud) markCloud(true);
+  }
+  return split;
 };
 const persistWorklogsToLS = grouped => {
   Object.entries(WORKLOG_LS_KEYS).forEach(([mod, lsKey]) => {
@@ -2042,7 +2054,7 @@ function App() {
   const [quotes, setQuotes] = useState(() => LS.get('erp_quotes', []));
   const [approvals, setApprovals] = useState(() => LS.get('erp_approvals', []));
   const [users, setUsers] = useState(() => LS.get('erp_users', INIT_USERS));
-  const [schedules, setSchedules] = useState(() => LS.get('erp_schedules', []));
+  const [schedules, setSchedules] = useState(() => filterRealSchedules(LS.get('erp_schedules', [])));
   const [pricelist, setPricelist] = useState(() => LS.get('erp_pricelist', []));
   const [invoices, setInvoices] = useState(() => LS.get('erp_invoices', []));
   const [bizReports, setBizReports] = useState([]);
@@ -2135,10 +2147,7 @@ function App() {
         if (tx.length > 0) setTaxInvoices(tx.map(fromDB.tax));
         if (qu.length > 0) setQuotes(qu.map(fromDB.quote));
         if (inv.length > 0) setInvoices(inv.map(fromDB.invoice));
-        if (sc.length > 0) {
-          const split = splitSchedulesRows(sc);
-          if (split.schedules.length > 0) setSchedules(split.schedules);
-        }
+        if (sc.length > 0) applyScheduleSplit(sc, setSchedules, setWorklogs, setWorklogCloudOk);
         if (pl.length > 0) {
           setPricelist(pl.map(fromDB.pricelist));
         } else if (INIT_PRICELIST.length > 0) {
@@ -2246,15 +2255,7 @@ function App() {
       conv: fromDB.quote
     }, {
       name: 'erp_schedules',
-      setter: data => {
-        const split = splitSchedulesRows(data);
-        if (split.schedules.length > 0) setSchedules(split.schedules);
-        if (Object.values(split.worklogs).some(a => a.length > 0)) {
-          setWorklogs(split.worklogs);
-          persistWorklogsToLS(split.worklogs);
-          setWorklogCloudOk(true);
-        }
-      },
+      setter: data => applyScheduleSplit(data, setSchedules, setWorklogs, setWorklogCloudOk),
       conv: r => r
     }, {
       name: 'erp_buyers',
@@ -2310,15 +2311,7 @@ function App() {
         if (re.length > 0) setReceipts(re.map(fromDB.receipt));
         if (pa.length > 0) setPayments(pa.map(fromDB.payment));
         if (qu.length > 0) setQuotes(qu.map(fromDB.quote));
-        if (sc.length > 0) {
-          const split = splitSchedulesRows(sc);
-          if (split.schedules.length > 0) setSchedules(split.schedules);
-          if (Object.values(split.worklogs).some(a => a.length > 0)) {
-            setWorklogs(split.worklogs);
-            persistWorklogsToLS(split.worklogs);
-            setWorklogCloudOk(true);
-          }
-        }
+        if (sc.length > 0) applyScheduleSplit(sc, setSchedules, setWorklogs, setWorklogCloudOk);
       } catch (err) { console.error(err); }
     }, 30000);
     return () => {
@@ -2372,7 +2365,7 @@ function App() {
     }
   }, [users]);
   useEffect(() => {
-    if (dbReady) LS.set('erp_schedules', schedules);
+    if (dbReady) LS.set('erp_schedules', filterRealSchedules(schedules));
   }, [schedules]);
   useEffect(() => {
     if (dbReady) LS.set('erp_pricelist', pricelist);
@@ -2534,8 +2527,16 @@ function App() {
       } catch (e) { console.error(e); }
     },
     schedule: async item => {
+      if (isWorklogScheduleItem(item)) return;
       try {
         await sb.upsert('erp_schedules', toDB.schedule(item));
+      } catch (e) { console.error(e); }
+    },
+    schedules: async items => {
+      try {
+        for (const item of filterRealSchedules(items)) {
+          await sb.upsert('erp_schedules', toDB.schedule(item));
+        }
       } catch (e) { console.error(e); }
     },
     delSchedule: async id => {
@@ -3134,7 +3135,7 @@ function App() {
       padding: 20,
       minWidth: 0
     }
-  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && user && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && canView('pricelist') && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CBMCalcPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), page === 'help' && /*#__PURE__*/React.createElement(HelpPage, null), page === 'online' && /*#__PURE__*/React.createElement(OnlineMatrixPage, null), page === 'orderform' && /*#__PURE__*/React.createElement(OrderFormPage, null), page === 'docform' && /*#__PURE__*/React.createElement(DocFormPage, null), page === 'exportdoc' && /*#__PURE__*/React.createElement(ExportDocPage, null), page === 'manual' && /*#__PURE__*/React.createElement(ManualPage, null), page === 'statement' && /*#__PURE__*/React.createElement(StatementPage, null), page === 'prodinfo' && /*#__PURE__*/React.createElement(ProductInfoPage, null), page === 'worklog' && /*#__PURE__*/React.createElement(WorkLogPage, null), 
+  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && user && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && canView('pricelist') && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && canView('schedule') && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CBMCalcPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), page === 'help' && /*#__PURE__*/React.createElement(HelpPage, null), page === 'online' && /*#__PURE__*/React.createElement(OnlineMatrixPage, null), page === 'orderform' && /*#__PURE__*/React.createElement(OrderFormPage, null), page === 'docform' && /*#__PURE__*/React.createElement(DocFormPage, null), page === 'exportdoc' && /*#__PURE__*/React.createElement(ExportDocPage, null), page === 'manual' && /*#__PURE__*/React.createElement(ManualPage, null), page === 'statement' && /*#__PURE__*/React.createElement(StatementPage, null), page === 'prodinfo' && /*#__PURE__*/React.createElement(ProductInfoPage, null), page === 'worklog' && /*#__PURE__*/React.createElement(WorkLogPage, null), 
     // 권한 차단 안내 (페이지는 매칭되는데 canView가 false인 경우)
     ['products','stock','sales','purchase','receipt','payment','tax','quote','buyers','pricelist','schedule','invoice'].includes(page) && !canView(page) && /*#__PURE__*/React.createElement("div", {
       style: { padding: 40, textAlign: 'center' }
@@ -3279,7 +3280,7 @@ function DashPage() {
           taxInvoices: taxInvoices || [],
           quotes: quotes || [],
           invoices: invoices || [],
-          schedules: schedules || [],
+          schedules: filterRealSchedules(schedules) || [],
           pricelist: pricelist || [],
           approvals: approvals || [],
           worklogs: worklogs || {}
@@ -3394,8 +3395,9 @@ function DashPage() {
   }).filter(p => p.revenue > 0).sort((a, b) => b.profit - a.profit);
   const lowStock = products.filter(p => getStock(p.id) <= (p.safe || 0) && p.safe > 0);
   const zeroStock = products.filter(p => getStock(p.id) <= 0 && p.safe > 0);
-  const todaySchedules = schedules.filter(s => s.date === todayStr() && s.status !== '완료');
-  const urgentSchedules = schedules.filter(s => {
+  const realSchedules = useMemo(() => filterRealSchedules(schedules), [schedules]);
+  const todaySchedules = realSchedules.filter(s => s.date === todayStr() && s.status !== '완료');
+  const urgentSchedules = realSchedules.filter(s => {
     const d = Math.ceil((new Date(s.date) - new Date(todayStr())) / (1000 * 60 * 60 * 24));
     return d >= 0 && d <= 3 && s.status !== '완료';
   });
@@ -12964,6 +12966,7 @@ function SchedulePage() {
     important: false
   });
   const editable = canEdit('schedule');
+  const realSchedules = useMemo(() => filterRealSchedules(schedules), [schedules]);
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
@@ -12977,7 +12980,7 @@ function SchedulePage() {
       return;
     }
     if (editId) {
-      const upd = schedules.map(s => s.id === editId ? {
+      const upd = realSchedules.map(s => s.id === editId ? {
         ...form,
         id: editId
       } : s);
@@ -13008,7 +13011,7 @@ function SchedulePage() {
   };
   const del = id => {
     const upd = {
-      ...schedules.find(s => s.id === id),
+      ...realSchedules.find(s => s.id === id),
       status: '취소',
       canceledAt: todayStr()
     };
@@ -13018,7 +13021,7 @@ function SchedulePage() {
   };
   const getDateScheds = d => {
     const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    return schedules.filter(s => s.date === ds && s.status !== '취소');
+    return realSchedules.filter(s => s.date === ds && s.status !== '취소');
   };
   const typeColor = {
     '중요': '#dc2626',
@@ -13028,7 +13031,7 @@ function SchedulePage() {
     '일반': '#15803d',
     '기타': '#64748b'
   };
-  const selScheds = selDate ? schedules.filter(s => s.date === selDate && s.status !== '취소') : [];
+  const selScheds = selDate ? realSchedules.filter(s => s.date === selDate && s.status !== '취소') : [];
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -13338,11 +13341,11 @@ function SchedulePage() {
       del(s.id);
     }
   }, "\uCDE8\uC18C"))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(CardHead, {
-    left: `${month + 1}월 전체 일정 (${schedules.filter(s => {
+    left: `${month + 1}월 전체 일정 (${realSchedules.filter(s => {
       const m = s.date?.slice(0, 7);
       return m === `${year}-${String(month + 1).padStart(2, '0')}` && s.status !== '취소';
     }).length}건)`
-  }), schedules.filter(s => {
+  }), realSchedules.filter(s => {
     const m = s.date?.slice(0, 7);
     return m === `${year}-${String(month + 1).padStart(2, '0')}` && s.status !== '취소';
   }).sort((a, b) => a.date > b.date ? 1 : -1).map((s, i) => /*#__PURE__*/React.createElement("div", {
@@ -13408,7 +13411,7 @@ function SchedulePage() {
       setEditId(s.id);
       setModal(true);
     }
-  }, "\u270F\uFE0F")))), schedules.filter(s => s.date?.slice(0, 7) === `${year}-${String(month + 1).padStart(2, '0')}` && s.status !== '취소').length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\u270F\uFE0F")))), realSchedules.filter(s => s.date?.slice(0, 7) === `${year}-${String(month + 1).padStart(2, '0')}` && s.status !== '취소').length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 24,
       textAlign: 'center',
@@ -16831,7 +16834,7 @@ function MyPage() {
         sales: sales || [], purchases: purchases || [], stocks: stocks || [],
         receipts: receipts || [], payments: payments || [], taxInvoices: taxInvoices || [],
         quotes: quotes || [], invoices: invoices || [], approvals: approvals || [],
-        products: products || [], buyers: buyers || [], users: users || [], schedules: schedules || []
+        products: products || [], buyers: buyers || [], users: users || [], schedules: filterRealSchedules(schedules) || []
       }
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
@@ -17174,7 +17177,7 @@ function MyPage() {
           taxInvoices: taxInvoices || [],
           quotes: quotes || [],
           invoices: invoices || [],
-          schedules: schedules || [],
+          schedules: filterRealSchedules(schedules) || [],
           pricelist: pricelist || [],
           approvals: approvals || [],
           worklogs: worklogs || {}
@@ -17216,7 +17219,11 @@ function MyPage() {
             if (d.taxInvoices) setTaxInvoices(d.taxInvoices);
             if (d.quotes) { setQuotes(d.quotes); if (syncDB.quotes) syncDB.quotes(d.quotes); }
             if (d.invoices) { setInvoices(d.invoices); if (syncDB.invoices) syncDB.invoices(d.invoices); }
-            if (d.schedules) { setSchedules(d.schedules); if (syncDB.schedules) syncDB.schedules(d.schedules); }
+            if (d.schedules) {
+              const real = filterRealSchedules(d.schedules);
+              setSchedules(real);
+              if (syncDB.schedules) syncDB.schedules(real);
+            }
             if (d.pricelist) setPricelist(d.pricelist);
             if (d.approvals) { setApprovals(d.approvals); if (syncDB.approvals) syncDB.approvals(d.approvals); }
             if (d.worklogs) {
