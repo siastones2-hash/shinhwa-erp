@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260619-final');
+console.log('🚀 신화ERP v3 - 빌드: 20260619-users');
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -871,21 +871,11 @@ const INIT_USERS = [{
   phone: '',
   dept: '전무'
 }, {
-  id: 'u003',
-  name: '이현석',
-  email: 'leestones',
-  password: '1234',
-  role: 'admin',
-  permissions: {},
-  active: true,
-  phone: '01048615237',
-  dept: '본부장'
-}, {
   id: 'u004',
   name: '한재성',
   email: 'hangwajang',
   password: '1234',
-  role: 'staff',
+  role: 'admin',
   permissions: {},
   active: true,
   phone: '',
@@ -906,7 +896,15 @@ const PERM_MENU_LABELS = {
   pricelist: '거래처단가',
   schedule: '스케줄'
 };
-const KNOWN_USER_ROLES = { u001: 'ceo', u002: 'vice', u003: 'admin', u004: 'staff' };
+const KNOWN_USER_ROLES = { u001: 'ceo', u002: 'vice', u004: 'admin' };
+const REMOVED_USER_IDS = ['u003'];
+const buildFullAdminPermissions = () => {
+  const p = {};
+  PERM_MENU_IDS.forEach(id => {
+    p[id] = { view: true, create: true, update: true, delete: true, edit: true };
+  });
+  return p;
+};
 const buildStaffDefaultPermissions = () => {
   const p = {};
   PERM_MENU_IDS.forEach(id => {
@@ -919,6 +917,9 @@ const normalizeUser = u => {
   const init = INIT_USERS.find(x => x.id === u.id);
   const role = KNOWN_USER_ROLES[u.id] || u.role || init?.role || 'staff';
   let permissions = u.permissions && typeof u.permissions === 'object' ? JSON.parse(JSON.stringify(u.permissions)) : {};
+  if (role === 'admin' || role === 'vice') {
+    permissions = buildFullAdminPermissions();
+  }
   if (role === 'staff') {
     const defaults = buildStaffDefaultPermissions();
     PERM_MENU_IDS.forEach(id => {
@@ -1948,14 +1949,20 @@ function LoginPage({
   const [err, setErr] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [lockUntil, setLockUntil] = useState(0);
-  const users = (usersProp && usersProp.length ? usersProp : LS.get('erp_users', INIT_USERS)).map(normalizeUser);
+  const users = (usersProp && usersProp.length ? usersProp : LS.get('erp_users', INIT_USERS))
+    .filter(u => !REMOVED_USER_IDS.includes(u.id))
+    .map(normalizeUser);
   const login = () => {
     if (Date.now() < lockUntil) {
       const sec = Math.ceil((lockUntil - Date.now()) / 1000);
       setErr(`${sec}초 후 다시 시도해주세요`);
       return;
     }
-    const u = users.find(u => u.email === email && u.password === pw && u.active);
+    if (email === 'leestones' || REMOVED_USER_IDS.some(id => users.find(x => x.id === id && x.email === email))) {
+      setErr('삭제된 계정입니다. 관리자에게 문의하세요.');
+      return;
+    }
+    const u = users.find(u => u.email === email && u.password === pw && u.active && !REMOVED_USER_IDS.includes(u.id));
     if (!u) {
       const na = attempts + 1;
       setAttempts(na);
@@ -2081,6 +2088,13 @@ function App() {
     }
     return normalizeUser(saved);
   });
+  useEffect(() => {
+    if (user && REMOVED_USER_IDS.includes(user.id)) {
+      setUser(null);
+      LS.set('erp_session', null);
+      alert('이 계정은 삭제되었습니다. 관리자에게 문의하세요.');
+    }
+  }, [user]);
   const [selectedBuyer, setSelectedBuyer] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [page, setPage] = useState('dash');
@@ -2211,14 +2225,20 @@ function App() {
         }
         // users: Supabase에 있으면 그대로 사용, 없으면 INIT_USERS 사용 (대표/관리자 계정 보장)
         if (us && us.length > 0) {
+          for (const rid of REMOVED_USER_IDS) {
+            if (us.some(r => r.id === rid)) {
+              try { await sb.delete('erp_users', rid); } catch (e) { console.warn('user delete:', rid, e); }
+            }
+          }
           const supaIds = new Set(us.map(u => u.id));
           const merged = [
-            ...us.map(r => normalizeUser(fromDB.user(r))),
-            ...INIT_USERS.filter(u => !supaIds.has(u.id)).map(normalizeUser)
+            ...us.filter(r => !REMOVED_USER_IDS.includes(r.id)).map(r => normalizeUser(fromDB.user(r))),
+            ...INIT_USERS.filter(u => !supaIds.has(u.id) && !REMOVED_USER_IDS.includes(u.id)).map(normalizeUser)
           ];
           setUsers(merged);
           LS.set('erp_users', merged);
           const needsUserSync = us.some(r => {
+            if (REMOVED_USER_IDS.includes(r.id)) return true;
             const n = merged.find(x => x.id === r.id);
             return !n || r.role !== n.role || !r.permissions?.schedule?.view;
           });
@@ -2228,11 +2248,16 @@ function App() {
             } catch (e) { console.warn('users sync:', e); }
           }
           if (user) {
-            const fresh = merged.find(x => x.id === user.id || x.email === user.email);
-            if (fresh) {
-              const updated = { ...normalizeUser(fresh), loginAt: user.loginAt };
-              setUser(updated);
-              LS.set('erp_session', updated);
+            if (REMOVED_USER_IDS.includes(user.id)) {
+              setUser(null);
+              LS.set('erp_session', null);
+            } else {
+              const fresh = merged.find(x => x.id === user.id || x.email === user.email);
+              if (fresh) {
+                const updated = { ...normalizeUser(fresh), loginAt: user.loginAt };
+                setUser(updated);
+                LS.set('erp_session', updated);
+              }
             }
           }
         }
