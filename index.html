@@ -608,6 +608,11 @@ const splitSchedulesRows = rows => {
   });
   return { schedules, worklogs };
 };
+const persistWorklogsToLS = grouped => {
+  Object.entries(WORKLOG_LS_KEYS).forEach(([mod, lsKey]) => {
+    LS.set(lsKey, grouped[WORKLOG_STATE_KEYS[mod]] || []);
+  });
+};
 const applyScheduleSplit = (rows, setSchedulesFn, setWorklogsFn, markCloud) => {
   const split = splitSchedulesRows(rows);
   setSchedulesFn(split.schedules);
@@ -617,11 +622,6 @@ const applyScheduleSplit = (rows, setSchedulesFn, setWorklogsFn, markCloud) => {
     if (markCloud) markCloud(true);
   }
   return split;
-};
-const persistWorklogsToLS = grouped => {
-  Object.entries(WORKLOG_LS_KEYS).forEach(([mod, lsKey]) => {
-    LS.set(lsKey, grouped[WORKLOG_STATE_KEYS[mod]] || []);
-  });
 };
 const loadWorklogsFromLS = () => ({
   meetings: LS.get(WORKLOG_LS_KEYS.meeting, LS.get(WORKLOG_LEGACY_KEYS.meeting, [])),
