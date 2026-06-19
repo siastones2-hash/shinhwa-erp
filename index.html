@@ -154,6 +154,7 @@ const fromDB = {
     brand: r.brand,
     cat: r.cat,
     sp: r.sp,
+    barcode: r.barcode || '',
     consumer: r.consumer || 0,
     cost: r.cost || 0,
     sale: r.sale || 0,
@@ -162,7 +163,8 @@ const fromDB = {
     safe: r.safe || 0,
     ship: r.ship || 3000,
     img: r.img || '',
-    status: r.status || 'active'
+    status: r.status || 'active',
+    inactive: !!r.inactive
   }),
   buyer: r => ({
     id: r.id,
@@ -175,6 +177,7 @@ const fromDB = {
     address: r.address || '',
     payment: r.payment || '',
     type: r.type || '국내',
+    buyerType: r.buyer_type || 'both',
     channel: r.channel || '',
     channelSub: r.channel_sub || '',
     status: r.status || 'active'
@@ -312,8 +315,14 @@ const fromDB = {
     password: r.password,
     role: r.role || 'staff',
     permissions: r.permissions || {},
-    active: r.active !== false
-  })
+    active: r.active !== false,
+    phone: r.phone || '',
+    dept: r.dept || ''
+  }),
+  worklog: r => {
+    const d = r.data && typeof r.data === 'object' ? r.data : {};
+    return { ...d, id: Number(r.id) || d.id || Date.now() };
+  }
 };
 
 // JS → DB 변환 (camelCase → snake_case)
@@ -486,7 +495,14 @@ const toDB = {
     password: u.password,
     role: u.role || 'staff',
     permissions: u.permissions || {},
-    active: u.active !== false
+    active: u.active !== false,
+    phone: u.phone || '',
+    dept: u.dept || ''
+  }),
+  worklog: (module, item) => ({
+    id: item.id,
+    module,
+    data: item
   })
 };
 const LS = {
@@ -504,7 +520,59 @@ const LS = {
     } catch (e) { console.error(e); }
   }
 };
+// 드래그(텍스트 선택) 후 backdrop에서 mouseup → 모달/오버레이가 닫히는 버그 방지
+function Backdrop({ onClose, style, children }) {
+  const downOnBackdrop = React.useRef(false);
+  return /*#__PURE__*/React.createElement("div", {
+    onMouseDown: e => { downOnBackdrop.current = e.target === e.currentTarget; },
+    onClick: e => {
+      if (e.target === e.currentTarget && downOnBackdrop.current) onClose();
+      downOnBackdrop.current = false;
+    },
+    style: { position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', ...style }
+  }, children);
+}
+// 사이드바/모바일 메뉴: 드래그(스크롤) 후 mouseup → 페이지 전환 방지
+function NavMenuItem({ onNavigate, active, style, children }) {
+  const ptr = React.useRef({ moved: false, x: 0, y: 0 });
+  return /*#__PURE__*/React.createElement("div", {
+    onPointerDown: e => { ptr.current = { moved: false, x: e.clientX, y: e.clientY }; },
+    onPointerMove: e => {
+      if (Math.hypot(e.clientX - ptr.current.x, e.clientY - ptr.current.y) > 8) ptr.current.moved = true;
+    },
+    onClick: () => { if (!ptr.current.moved) onNavigate(); },
+    style: { cursor: 'pointer', userSelect: 'none', ...style }
+  }, children);
+}
 const todayStr = () => new Date().toISOString().slice(0, 10);
+const WORKLOG_LS_KEYS = {
+  meeting: 'erp_worklog_meetings',
+  prod: 'erp_worklog_proddevs',
+  order: 'erp_worklog_prodorders',
+  monthly: 'erp_worklog_monthly',
+  grant: 'erp_worklog_grants'
+};
+const WORKLOG_LEGACY_KEYS = {
+  meeting: 'shi_meetings',
+  prod: 'shi_proddevs',
+  order: 'shi_prodorders',
+  monthly: 'shi_monthly',
+  grant: 'shi_grants'
+};
+const WORKLOG_STATE_KEYS = {
+  meeting: 'meetings',
+  prod: 'proddevs',
+  order: 'prodorders',
+  monthly: 'monthly',
+  grant: 'grants'
+};
+const loadWorklogsFromLS = () => ({
+  meetings: LS.get(WORKLOG_LS_KEYS.meeting, LS.get(WORKLOG_LEGACY_KEYS.meeting, [])),
+  proddevs: LS.get(WORKLOG_LS_KEYS.prod, LS.get(WORKLOG_LEGACY_KEYS.prod, [])),
+  prodorders: LS.get(WORKLOG_LS_KEYS.order, LS.get(WORKLOG_LEGACY_KEYS.order, [])),
+  monthly: LS.get(WORKLOG_LS_KEYS.monthly, LS.get(WORKLOG_LEGACY_KEYS.monthly, [])),
+  grants: LS.get(WORKLOG_LS_KEYS.grant, LS.get(WORKLOG_LEGACY_KEYS.grant, []))
+});
 const won = n => `₩${(Number(n) || 0).toLocaleString()}`;
 // === 엑셀/CSV 다운로드 헬퍼 ===
 const downloadCSV = (rows, filename) => {
@@ -740,7 +808,7 @@ const INIT_USERS = [{
   name: '이민수',
   email: 'leeminsoo',
   password: '1234',
-  role: 'admin',
+  role: 'vice',
   permissions: {},
   active: true,
   phone: '',
@@ -1578,19 +1646,15 @@ const Modal = ({
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
   }, [onClose]);
-  return /*#__PURE__*/React.createElement("div", {
-    onClick: onClose,
+  return /*#__PURE__*/React.createElement(Backdrop, {
+    onClose,
     style: {
-      position: 'fixed',
-      inset: 0,
       background: 'rgba(15,23,42,.5)',
       backdropFilter: 'blur(3px)',
-      zIndex: 200,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
+      zIndex: 200
     }
   }, /*#__PURE__*/React.createElement("div", {
+    onMouseDown: e => e.stopPropagation(),
     onClick: e => e.stopPropagation(),
     style: {
       background: '#fff',
@@ -1945,6 +2009,8 @@ function App() {
     monthly: [],
     support: []
   });
+  const [worklogs, setWorklogs] = useState(() => loadWorklogsFromLS());
+  const [worklogCloudOk, setWorklogCloudOk] = useState(false);
 
   // SheetJS 로드
   useEffect(() => {
@@ -2038,8 +2104,39 @@ function App() {
           setUsers(merged);
         }
         if (ap && ap.length > 0) setApprovals(ap);
+        try {
+          const wlProbe = await fetch(`${SUPABASE_URL}/rest/v1/erp_worklogs?select=id&limit=1`, { headers: sb.headers });
+          if (wlProbe.ok) {
+            setWorklogCloudOk(true);
+            const wl = await safeGet('erp_worklogs');
+            if (wl.length > 0) {
+              const grouped = { meetings: [], proddevs: [], prodorders: [], monthly: [], grants: [] };
+              wl.forEach(r => {
+                const item = fromDB.worklog(r);
+                if (r.module === 'meeting') grouped.meetings.push(item);
+                else if (r.module === 'prod') grouped.proddevs.push(item);
+                else if (r.module === 'order') grouped.prodorders.push(item);
+                else if (r.module === 'monthly') grouped.monthly.push(item);
+                else if (r.module === 'grant') grouped.grants.push(item);
+              });
+              setWorklogs(grouped);
+              Object.entries(WORKLOG_LS_KEYS).forEach(([mod, lsKey]) => {
+                LS.set(lsKey, grouped[WORKLOG_STATE_KEYS[mod]]);
+              });
+            } else {
+              const local = loadWorklogsFromLS();
+              const hasLocal = Object.values(local).some(a => a.length > 0);
+              if (hasLocal) {
+                setWorklogs(local);
+              }
+            }
+          } else {
+            setWorklogCloudOk(false);
+          }
+        } catch (e) {
+          setWorklogCloudOk(false);
+        }
         setDbReady(true);
-        ;
       } catch (e) {
         console.error('Supabase 로드 실패, 로컬 데이터 사용:', e);
         setDbReady(true);
@@ -2129,11 +2226,11 @@ function App() {
                 if (data && data.length > 0) setter(data.map(conv));
               }).catch(() => {});
             }
-          } catch (err) { console.error(e); }
+          } catch (err) { console.error(err); }
         };
         ws.onerror = () => {};
         channels.push(ws);
-      } catch (err) { console.error(e); }
+      } catch (err) { console.error(err); }
     });
 
     // 30초마다 폴링 (WebSocket 실패 대비)
@@ -2147,7 +2244,7 @@ function App() {
         if (pa.length > 0) setPayments(pa.map(fromDB.payment));
         if (qu.length > 0) setQuotes(qu.map(fromDB.quote));
         if (sc.length > 0) setSchedules(sc.map(fromDB.schedule));
-      } catch (err) { console.error(e); }
+      } catch (err) { console.error(err); }
     }, 30000);
     return () => {
       channels.forEach(ws => {
@@ -2208,15 +2305,24 @@ function App() {
   useEffect(() => {
     if (dbReady) LS.set('erp_invoices', invoices);
   }, [invoices]);
+  useEffect(() => {
+    if (dbReady) {
+      LS.set(WORKLOG_LS_KEYS.meeting, worklogs.meetings);
+      LS.set(WORKLOG_LS_KEYS.prod, worklogs.proddevs);
+      LS.set(WORKLOG_LS_KEYS.order, worklogs.prodorders);
+      LS.set(WORKLOG_LS_KEYS.monthly, worklogs.monthly);
+      LS.set(WORKLOG_LS_KEYS.grant, worklogs.grants);
+    }
+  }, [worklogs, dbReady]);
 
   // ── Supabase 실시간 동기화 함수들 ──
   const syncDB = {
     users: async data => {
       try {
         // role 검증: Supabase erp_users 테이블에 등록된 값만 허용
-        const validRoles = ['ceo', 'admin', 'staff'];
+        const validRoles = ['ceo', 'admin', 'vice', 'staff'];
         const cleaned = data.map(u => {
-          const safeRole = validRoles.includes(u.role) ? u.role : (u.role === 'vice' ? 'admin' : 'staff');
+          const safeRole = validRoles.includes(u.role) ? u.role : 'staff';
           return {
             id: String(u.id || ('u' + Date.now())),
             name: String(u.name || ''),
@@ -2371,8 +2477,55 @@ function App() {
       try {
         await sb.delete('erp_pricelist', id);
       } catch (e) { console.error(e); }
+    },
+    worklogsModule: async (module, items) => {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/erp_worklogs?module=eq.${encodeURIComponent(module)}`, {
+          method: 'DELETE',
+          headers: sb.headers
+        });
+        if (!items || items.length === 0) return true;
+        const rows = items.map(item => toDB.worklog(module, item));
+        for (let i = 0; i < rows.length; i += 100) {
+          await sb.upsert('erp_worklogs', rows.slice(i, i + 100));
+        }
+        return true;
+      } catch (e) {
+        console.warn('worklogs sync skip:', module, e);
+        return false;
+      }
+    },
+    delWorklog: async id => {
+      try {
+        await sb.delete('erp_worklogs', id);
+      } catch (e) { console.error(e); }
     }
   };
+  const worklogMigratedRef = React.useRef(false);
+  useEffect(() => {
+    if (!user || !dbReady || !worklogCloudOk || worklogMigratedRef.current) return;
+    (async () => {
+      try {
+        const wl = await sb.get('erp_worklogs');
+        if (wl.length > 0) {
+          worklogMigratedRef.current = true;
+          return;
+        }
+        let uploaded = 0;
+        for (const mod of Object.keys(WORKLOG_STATE_KEYS)) {
+          const sk = WORKLOG_STATE_KEYS[mod];
+          if (worklogs[sk]?.length) {
+            await syncDB.worklogsModule(mod, worklogs[sk]);
+            uploaded += worklogs[sk].length;
+          }
+        }
+        if (uploaded > 0) showToast(`☁️ 업무 ${uploaded}건 클라우드 저장`, '#15803d');
+      } catch (e) {
+        console.warn('worklog migrate skip:', e);
+      }
+      worklogMigratedRef.current = true;
+    })();
+  }, [dbReady, worklogCloudOk, user]);
   const showToast = (msg, c = '#0f172a') => {
     setToast({
       msg,
@@ -2515,6 +2668,18 @@ function App() {
     return a.id;
   };
   const pendingCount = approvals.filter(a => a.status === '대기').length;
+  const saveWorklogModule = (module, items) => {
+    const sk = WORKLOG_STATE_KEYS[module];
+    const lsKey = WORKLOG_LS_KEYS[module];
+    if (!sk || !lsKey) return;
+    setWorklogs(prev => ({ ...prev, [sk]: items }));
+    LS.set(lsKey, items);
+    if (dbReady && worklogCloudOk && syncDB.worklogsModule) {
+      syncDB.worklogsModule(module, items).then(ok => {
+        if (!ok) showToast('⚠️ 클라우드 저장 실패 — 로컬에만 저장됨', '#dc2626');
+      });
+    }
+  };
   const ctx = {
     user,
     setUser,
@@ -2552,6 +2717,10 @@ function App() {
     setBizReports,
     annexData,
     setAnnexData,
+    worklogs,
+    setWorklogs,
+    saveWorklogModule,
+    worklogCloudOk,
     getStock,
     showToast,
     canView,
@@ -2726,17 +2895,16 @@ function App() {
       cursor: 'pointer',
       padding: '4px 6px'
     }
-  }, "\u2630")), mobileMenuOpen && /*#__PURE__*/React.createElement("div", {
-    className: "mobile-overlay",
-    onClick: () => setMobileMenuOpen(false),
+  }, "\u2630")), mobileMenuOpen && /*#__PURE__*/React.createElement(Backdrop, {
+    onClose: () => setMobileMenuOpen(false),
     style: {
-      position: 'fixed',
-      inset: 0,
       background: 'rgba(0,0,0,.5)',
       zIndex: 200,
-      display: 'flex'
+      alignItems: 'stretch',
+      justifyContent: 'flex-start'
     }
   }, /*#__PURE__*/React.createElement("div", {
+    onMouseDown: e => e.stopPropagation(),
     onClick: e => e.stopPropagation(),
     style: {
       width: 260,
@@ -2777,18 +2945,18 @@ function App() {
     },
     color: "outline",
     sm: true
-  }, "\uB85C\uADF8\uC544\uC6C3"))), visibleMenus.map(n => /*#__PURE__*/React.createElement("div", {
+  }, "\uB85C\uADF8\uC544\uC6C3"))), visibleMenus.map(n => /*#__PURE__*/React.createElement(NavMenuItem, {
     key: n.id,
-    onClick: () => {
+    onNavigate: () => {
       setPage(n.id);
       setMobileMenuOpen(false);
     },
+    active: page === n.id,
     style: {
       display: 'flex',
       alignItems: 'center',
       gap: 10,
       padding: '12px 16px',
-      cursor: 'pointer',
       fontSize: 14,
       color: page === n.id ? '#1d4ed8' : '#475569',
       background: page === n.id ? '#eff6ff' : 'transparent',
@@ -2811,7 +2979,7 @@ function App() {
       fontSize: 11,
       fontWeight: 700
     }
-  }, pendingCount))))), /*#__PURE__*/React.createElement("div", {
+  }, pendingCount)))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: '180px 1fr',
@@ -2825,15 +2993,15 @@ function App() {
       padding: '8px 0',
       overflowY: 'auto'
     }
-  }, visibleMenus.map(n => /*#__PURE__*/React.createElement("div", {
+  }, visibleMenus.map(n => /*#__PURE__*/React.createElement(NavMenuItem, {
     key: n.id,
-    onClick: () => setPage(n.id),
+    onNavigate: () => setPage(n.id),
+    active: page === n.id,
     style: {
       display: 'flex',
       alignItems: 'center',
       gap: 8,
       padding: '7px 12px',
-      cursor: 'pointer',
       fontSize: 12,
       color: page === n.id ? '#1d4ed8' : '#475569',
       background: page === n.id ? '#eff6ff' : 'transparent',
@@ -2863,7 +3031,7 @@ function App() {
       padding: 20,
       minWidth: 0
     }
-  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && user && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && canView('pricelist') && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CbmPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), page === 'help' && /*#__PURE__*/React.createElement(HelpPage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CBMCalcPage, null), page === 'online' && /*#__PURE__*/React.createElement(OnlineMatrixPage, null), page === 'orderform' && /*#__PURE__*/React.createElement(OrderFormPage, null), page === 'docform' && /*#__PURE__*/React.createElement(DocFormPage, null), page === 'exportdoc' && /*#__PURE__*/React.createElement(ExportDocPage, null), page === 'manual' && /*#__PURE__*/React.createElement(ManualPage, null), page === 'statement' && /*#__PURE__*/React.createElement(StatementPage, null), page === 'prodinfo' && /*#__PURE__*/React.createElement(ProductInfoPage, null), page === 'worklog' && /*#__PURE__*/React.createElement(WorkLogPage, null), 
+  }, page === 'dash' && /*#__PURE__*/React.createElement(DashPage, null), page === 'products' && canView('products') && /*#__PURE__*/React.createElement(ProductsPage, null), page === 'stock' && canView('stock') && /*#__PURE__*/React.createElement(StockPage, null), page === 'sales' && canView('sales') && /*#__PURE__*/React.createElement(SalesPage, null), page === 'purchase' && canView('purchase') && /*#__PURE__*/React.createElement(PurchasePage, null), page === 'receipt' && canView('receipt') && /*#__PURE__*/React.createElement(ReceiptPage, null), page === 'payment' && canView('payment') && /*#__PURE__*/React.createElement(PaymentPage, null), page === 'tax' && canView('tax') && /*#__PURE__*/React.createElement(TaxPage, null), page === 'quote' && canView('quote') && /*#__PURE__*/React.createElement(QuotePage, null), page === 'buyers' && canView('buyers') && /*#__PURE__*/React.createElement(BuyersPage, null), page === 'buyer_detail' && canView('buyers') && /*#__PURE__*/React.createElement(BuyerDetailPage, null), page === 'cashbook' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(CashbookPage, null), page === 'profitloss' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ProfitLossPage, null), page === 'approval' && user && /*#__PURE__*/React.createElement(ApprovalPage, null), page === 'pricelist' && canView('pricelist') && /*#__PURE__*/React.createElement(PriceListPage, null), page === 'report' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(ReportPage, null), page === 'schedule' && /*#__PURE__*/React.createElement(SchedulePage, null), page === 'cbm' && /*#__PURE__*/React.createElement(CBMCalcPage, null), page === 'invoice' && /*#__PURE__*/React.createElement(InvoicePage, null), page === 'bizreport' && /*#__PURE__*/React.createElement(BizReportPage, null), page === 'annex' && /*#__PURE__*/React.createElement(AnnexPage, null), page === 'users' && (user.role === 'ceo' || user.role === 'admin' || user.role === 'vice') && /*#__PURE__*/React.createElement(UsersPage, null), page === 'mypage' && /*#__PURE__*/React.createElement(MyPage, null), page === 'help' && /*#__PURE__*/React.createElement(HelpPage, null), page === 'online' && /*#__PURE__*/React.createElement(OnlineMatrixPage, null), page === 'orderform' && /*#__PURE__*/React.createElement(OrderFormPage, null), page === 'docform' && /*#__PURE__*/React.createElement(DocFormPage, null), page === 'exportdoc' && /*#__PURE__*/React.createElement(ExportDocPage, null), page === 'manual' && /*#__PURE__*/React.createElement(ManualPage, null), page === 'statement' && /*#__PURE__*/React.createElement(StatementPage, null), page === 'prodinfo' && /*#__PURE__*/React.createElement(ProductInfoPage, null), page === 'worklog' && /*#__PURE__*/React.createElement(WorkLogPage, null), 
     // 권한 차단 안내 (페이지는 매칭되는데 canView가 false인 경우)
     ['products','stock','sales','purchase','receipt','payment','tax','quote','buyers','pricelist','schedule','invoice'].includes(page) && !canView(page) && /*#__PURE__*/React.createElement("div", {
       style: { padding: 40, textAlign: 'center' }
@@ -2871,7 +3039,7 @@ function App() {
       style: { fontSize: 16, color: '#dc2626', fontWeight: 700, marginBottom: 8 }
     }, "🔒 이 메뉴를 볼 권한이 없습니다"), /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 12, color: '#94a3b8' }
-    }, "대표에게 권한을 요청하세요")), !['dash','products','stock','sales','purchase','receipt','payment','tax','quote','buyers','buyer_detail','cashbook','profitloss','approval','pricelist','report','schedule','cbm','invoice','bizreport','annex','users','mypage','help'].includes(page) && /*#__PURE__*/React.createElement("div", {
+    }, "대표에게 권한을 요청하세요")), !['dash','products','stock','sales','purchase','receipt','payment','tax','quote','buyers','buyer_detail','cashbook','profitloss','approval','pricelist','report','schedule','cbm','invoice','bizreport','annex','users','mypage','help','online','orderform','docform','exportdoc','manual','statement','prodinfo','worklog'].includes(page) && /*#__PURE__*/React.createElement("div", {
     style: { padding: 40, textAlign: 'center', color: '#94a3b8' }
   }, "\uD398\uC774\uC9C0\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uB300\uC2DC\uBCF4\uB4DC\uB85C \uB3CC\uC544\uAC00\uC138\uC694."))), /*#__PURE__*/React.createElement("div", {
     className: "mobile-bottom-nav",
@@ -2886,9 +3054,10 @@ function App() {
       zIndex: 150,
       height: 58
     }
-  }, bottomMenus.slice(0, 4).map(n => /*#__PURE__*/React.createElement("div", {
+  }, bottomMenus.slice(0, 4).map(n => /*#__PURE__*/React.createElement(NavMenuItem, {
     key: n.id,
-    onClick: () => setPage(n.id),
+    onNavigate: () => setPage(n.id),
+    active: page === n.id,
     style: {
       flex: 1,
       display: 'flex',
@@ -2896,7 +3065,6 @@ function App() {
       alignItems: 'center',
       justifyContent: 'center',
       gap: 2,
-      cursor: 'pointer',
       color: page === n.id ? '#1d4ed8' : '#94a3b8',
       paddingTop: 6
     }
@@ -2963,6 +3131,8 @@ function DashPage() {
     invoices,
     pricelist,
     approvals,
+    worklogs,
+    saveWorklogModule,
     setPage,
     setReceiptFilter,
     stocks,
@@ -3008,7 +3178,8 @@ function DashPage() {
           invoices: invoices || [],
           schedules: schedules || [],
           pricelist: pricelist || [],
-          approvals: approvals || []
+          approvals: approvals || [],
+          worklogs: worklogs || {}
         }
       };
       downloadBackup(backup);
@@ -5762,19 +5933,15 @@ function StockPage() {
         sm: true
       }, "\u2715"))));
     })
-  })), modal === 'bulk' && /*#__PURE__*/React.createElement("div", {
-    onClick: () => setModal(null),
+  })), modal === 'bulk' && /*#__PURE__*/React.createElement(Backdrop, {
+    onClose: () => setModal(null),
     style: {
-      position: 'fixed',
-      inset: 0,
       background: 'rgba(15,23,42,.5)',
       backdropFilter: 'blur(3px)',
-      zIndex: 200,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
+      zIndex: 200
     }
   }, /*#__PURE__*/React.createElement("div", {
+    onMouseDown: e => e.stopPropagation(),
     onClick: e => e.stopPropagation(),
     style: {
       background: '#fff',
@@ -5964,20 +6131,16 @@ function StockPage() {
     const history = [...stocks].filter(s => s.productId === stockDetail.id).reverse().slice(0, 15);
     const tin = stocks.filter(s => s.productId === stockDetail.id && s.type === 'in').reduce((a, s) => a + s.qty, 0);
     const tout = stocks.filter(s => s.productId === stockDetail.id && s.type === 'out').reduce((a, s) => a + s.qty, 0);
-    return /*#__PURE__*/React.createElement("div", {
-      onClick: () => setStockDetail(null),
+    return /*#__PURE__*/React.createElement(Backdrop, {
+      onClose: () => setStockDetail(null),
       style: {
-        position: 'fixed',
-        inset: 0,
         background: 'rgba(15,23,42,.55)',
         backdropFilter: 'blur(4px)',
         zIndex: 300,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
         padding: 16
       }
     }, /*#__PURE__*/React.createElement("div", {
+      onMouseDown: e => e.stopPropagation(),
       onClick: e => e.stopPropagation(),
       style: {
         background: '#fff',
@@ -6322,20 +6485,16 @@ function ProductDetailModal({
   const stock = getStock(product.id);
   const margin = product.consumer && product.cost ? Math.round((1 - product.cost / product.consumer) * 100) : null;
   const fobMargin = product.fob && product.cost ? Math.round((1 - product.cost / (product.fob * 1350)) * 100) : null;
-  return /*#__PURE__*/React.createElement("div", {
-    onClick: onClose,
+  return /*#__PURE__*/React.createElement(Backdrop, {
+    onClose,
     style: {
-      position: 'fixed',
-      inset: 0,
       background: 'rgba(15,23,42,.55)',
       backdropFilter: 'blur(4px)',
       zIndex: 300,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
       padding: 16
     }
   }, /*#__PURE__*/React.createElement("div", {
+    onMouseDown: e => e.stopPropagation(),
     onClick: e => e.stopPropagation(),
     style: {
       background: '#fff',
@@ -6637,7 +6796,8 @@ function BuyerSelect({
     }
   }, "\uAC70\uB798\uCC98 ", buyers.length, "\uAC1C"), filtered.map(b => /*#__PURE__*/React.createElement("div", {
     key: b.id,
-    onMouseDown: () => {
+    onMouseDown: e => {
+      e.preventDefault();
       setQuery(b.name);
       onChange(b.name);
       setOpen(false);
@@ -6734,7 +6894,7 @@ function ProductSelect({
     style: { ...inp, fontSize: 12, flex: 1, padding: '6px 8px' }
   }, /*#__PURE__*/React.createElement("option", { value: '' }, "\uD83D\uDCC2 \uC804\uCCB4 \uCE74\uD14C\uACE0\uB9AC"), allCats.map(c => /*#__PURE__*/React.createElement("option", { key: c, value: c }, c))), (filterBrand || filterCat || query) && /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onMouseDown: e => { e.preventDefault(); setFilterBrand(''); setFilterCat(''); setQuery(''); onChange(''); },
+    onMouseDown: e => { e.preventDefault(); setFilterBrand(''); setFilterCat(''); setQuery(''); onChange(''); setOpen(false); },
     style: { background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 6, padding: '6px 10px', cursor: 'pointer', color: '#991b1b', fontSize: 11, fontWeight: 600 }
   }, "\u2715 \uCD08\uAE30\uD654")), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6767,7 +6927,7 @@ function ProductSelect({
       fontSize: 12,
       color: '#475569'
     }
-  }, "\u25BC")), open && filtered.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\u25BC")), open && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'absolute',
       top: 'calc(100% + 4px)',
@@ -6781,7 +6941,9 @@ function ProductSelect({
       maxHeight: 420,
       overflowY: 'auto'
     }
-  }, !query && /*#__PURE__*/React.createElement("div", {
+  }, filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { padding: '16px 12px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }
+  }, (filterBrand || filterCat) ? '해당 브랜드/카테고리에 상품이 없습니다' : '검색 결과가 없습니다') : null, filtered.length > 0 && !query && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '6px 12px',
       fontSize: 11,
@@ -6789,18 +6951,9 @@ function ProductSelect({
       background: '#f8fafc',
       borderBottom: '1px solid #e2e8f0'
     }
-  }, (() => {
-    const filterText = (filterBrand || filterCat) ? ((filterBrand ? '\uBE0C\uB79C\uB4DC[' + filterBrand + ']' : '') + (filterCat ? ' \uCE74\uD14C\uACE0\uB9AC[' + filterCat + ']' : '') + ' \uD544\uD130 \uC801\uC6A9 - ') : '';
-    if (query) {
-      return "\uD83D\uDD0D " + filterText + "\uAC80\uC0C9 \uACB0\uACFC: " + allFiltered.length + "\uAC1C" + (allFiltered.length > 500 ? " (\uC0C1\uC704 500\uAC1C \uD45C\uC2DC)" : "");
-    } else if (filterBrand || filterCat) {
-      return "\uD83C\uDFF7\uFE0F " + filterText + preFiltered.length + "\uAC1C";
-    } else {
-      return "\uD83D\uDD0D \uC774\uB984/\uBE0C\uB79C\uB4DC/\uCF54\uB4DC/\uBC14\uCF54\uB4DC \uAC80\uC0C9 (\uC804\uCCB4 " + activeProducts.length + "\uAC1C \uC911 \uC0C1\uC704 100\uAC1C)";
-    }
-  })()), filtered.map(p => /*#__PURE__*/React.createElement("div", {
+  }, (filterBrand || filterCat) ? '\uD83C\uDFF7\uFE0F ' + (filterBrand ? '브랜드[' + filterBrand + ']' : '') + (filterCat ? ' 카테고리[' + filterCat + ']' : '') + ' ' + preFiltered.length + '개' : '\uD83D\uDD0D 전체 ' + activeProducts.length + '개 중 상위 100개'), filtered.length > 0 && filtered.map(p => /*#__PURE__*/React.createElement("div", {
     key: p.id,
-    onMouseDown: () => handleSelect(p),
+    onMouseDown: e => { e.preventDefault(); handleSelect(p); },
     style: {
       padding: '8px 12px',
       cursor: 'pointer',
@@ -14758,7 +14911,7 @@ function InvoicePage() {
     }
   }, "\uD83D\uDD0D \uC0C1\uD488 ", getFiltered(idx).length, "\uAC1C \u2014 \uD074\uB9AD\uD558\uBA74 \uAC00\uACA9 \uC790\uB3D9\uC785\uB825"), getFiltered(idx).map(p => /*#__PURE__*/React.createElement("div", {
     key: p.id,
-    onMouseDown: () => handleItemSelect(idx, p),
+    onMouseDown: e => { e.preventDefault(); handleItemSelect(idx, p); },
     style: {
       padding: '8px 12px',
       cursor: 'pointer',
@@ -16136,33 +16289,10 @@ function ProductInfoPage() {
 
 
 function WorkLogPage() {
-  const auth = useAuth();
-  if (!auth.user) return null;
-  const { showToast = () => {} } = auth;
+  const { worklogs, saveWorklogModule, worklogCloudOk, showToast = () => {} } = useAuth();
+  const { meetings, proddevs, prodorders: orders, monthly, grants } = worklogs;
   
   const [tab, setTab] = React.useState('meeting');
-  
-  // localStorage 키
-  const KEYS = {
-    meeting: 'shi_meetings',
-    prod: 'shi_proddevs',
-    order: 'shi_prodorders',
-    monthly: 'shi_monthly',
-    grant: 'shi_grants'
-  };
-  
-  const load = (key) => {
-    try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
-  };
-  const save = (key, data) => {
-    localStorage.setItem(key, JSON.stringify(data));
-  };
-  
-  const [meetings, setMeetings] = React.useState(load(KEYS.meeting));
-  const [proddevs, setProddevs] = React.useState(load(KEYS.prod));
-  const [orders, setOrders] = React.useState(load(KEYS.order));
-  const [monthly, setMonthly] = React.useState(load(KEYS.monthly));
-  const [grants, setGrants] = React.useState(load(KEYS.grant));
   
   // 회의록
   const [meetForm, setMeetForm] = React.useState({
@@ -16172,14 +16302,14 @@ function WorkLogPage() {
   const addMeeting = () => {
     if (!meetForm.title) { showToast('제목 입력', '#dc2626'); return; }
     const newList = [{ ...meetForm, id: Date.now() }, ...meetings];
-    setMeetings(newList); save(KEYS.meeting, newList);
+    saveWorklogModule('meeting', newList);
     setMeetForm({ date: new Date().toISOString().substring(0, 10), title: '', participants: '', agenda: '', notes: '', action: '' });
     showToast('✅ 회의록 저장', '#16a34a');
   };
   const delMeeting = (id) => {
     if (!confirm('삭제?')) return;
     const newList = meetings.filter(m => m.id !== id);
-    setMeetings(newList); save(KEYS.meeting, newList);
+    saveWorklogModule('meeting', newList);
   };
   
   // 상품개발
@@ -16190,18 +16320,18 @@ function WorkLogPage() {
   const addProddev = () => {
     if (!prodForm.name) { showToast('상품명 입력', '#dc2626'); return; }
     const newList = [{ ...prodForm, id: Date.now() }, ...proddevs];
-    setProddevs(newList); save(KEYS.prod, newList);
+    saveWorklogModule('prod', newList);
     setProdForm({ name: '', cat: '식품', stage: '기획', startDate: new Date().toISOString().substring(0, 10), targetDate: '', notes: '' });
     showToast('✅ 상품개발 등록', '#16a34a');
   };
   const updProddevStage = (id, stage) => {
     const newList = proddevs.map(p => p.id === id ? { ...p, stage } : p);
-    setProddevs(newList); save(KEYS.prod, newList);
+    saveWorklogModule('prod', newList);
   };
   const delProddev = (id) => {
     if (!confirm('삭제?')) return;
     const newList = proddevs.filter(p => p.id !== id);
-    setProddevs(newList); save(KEYS.prod, newList);
+    saveWorklogModule('prod', newList);
   };
   
   // 수주/생산
@@ -16213,18 +16343,18 @@ function WorkLogPage() {
   const addOrder = () => {
     if (!orderForm.product) { showToast('품목 입력', '#dc2626'); return; }
     const newList = [{ ...orderForm, id: Date.now() }, ...orders];
-    setOrders(newList); save(KEYS.order, newList);
+    saveWorklogModule('order', newList);
     setOrderForm({ orderDate: new Date().toISOString().substring(0, 10), buyer: '', product: '', qty: 0, status: '수주', prodDate: '', deliveryDate: '', notes: '' });
     showToast('✅ 수주 등록', '#16a34a');
   };
   const updOrderStatus = (id, status) => {
     const newList = orders.map(o => o.id === id ? { ...o, status } : o);
-    setOrders(newList); save(KEYS.order, newList);
+    saveWorklogModule('order', newList);
   };
   const delOrder = (id) => {
     if (!confirm('삭제?')) return;
     const newList = orders.filter(o => o.id !== id);
-    setOrders(newList); save(KEYS.order, newList);
+    saveWorklogModule('order', newList);
   };
   
   // 월간 업무
@@ -16235,18 +16365,18 @@ function WorkLogPage() {
   const addMonthly = () => {
     if (!monForm.task) { showToast('업무 입력', '#dc2626'); return; }
     const newList = [{ ...monForm, id: Date.now() }, ...monthly];
-    setMonthly(newList); save(KEYS.monthly, newList);
+    saveWorklogModule('monthly', newList);
     setMonForm({ month: new Date().toISOString().substring(0, 7), task: '', owner: '', priority: '중', status: '진행중', notes: '' });
     showToast('✅ 월간업무 등록', '#16a34a');
   };
   const updMonthlyStatus = (id, status) => {
     const newList = monthly.map(m => m.id === id ? { ...m, status } : m);
-    setMonthly(newList); save(KEYS.monthly, newList);
+    saveWorklogModule('monthly', newList);
   };
   const delMonthly = (id) => {
     if (!confirm('삭제?')) return;
     const newList = monthly.filter(m => m.id !== id);
-    setMonthly(newList); save(KEYS.monthly, newList);
+    saveWorklogModule('monthly', newList);
   };
   
   // 지원사업
@@ -16257,18 +16387,18 @@ function WorkLogPage() {
   const addGrant = () => {
     if (!grantForm.name) { showToast('사업명 입력', '#dc2626'); return; }
     const newList = [{ ...grantForm, id: Date.now() }, ...grants];
-    setGrants(newList); save(KEYS.grant, newList);
+    saveWorklogModule('grant', newList);
     setGrantForm({ name: '', agency: '', applyDate: '', resultDate: '', amount: 0, status: '신청예정', notes: '' });
     showToast('✅ 지원사업 등록', '#16a34a');
   };
   const updGrantStatus = (id, status) => {
     const newList = grants.map(g => g.id === id ? { ...g, status } : g);
-    setGrants(newList); save(KEYS.grant, newList);
+    saveWorklogModule('grant', newList);
   };
   const delGrant = (id) => {
     if (!confirm('삭제?')) return;
     const newList = grants.filter(g => g.id !== id);
-    setGrants(newList); save(KEYS.grant, newList);
+    saveWorklogModule('grant', newList);
   };
   
   const tabs = [
@@ -16283,7 +16413,16 @@ function WorkLogPage() {
   const btnAdd = { padding: '8px 16px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 };
   
   return /*#__PURE__*/React.createElement("div", { style: { padding: 16 } },
-    /*#__PURE__*/React.createElement("h2", { style: { marginBottom: 16, color: '#1e293b' } }, "\uD83D\uDCD3 \uC5C5\uBB34 \uAD00\uB9AC"),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 } },
+      /*#__PURE__*/React.createElement("h2", { style: { color: '#1e293b', margin: 0 } }, "\uD83D\uDCD3 \uC5C5\uBB34 \uAD00\uB9AC"),
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11, padding: '4px 10px', borderRadius: 20, fontWeight: 600,
+          background: worklogCloudOk ? '#dcfce7' : '#fef3c7',
+          color: worklogCloudOk ? '#15803d' : '#92400e'
+        }
+      }, worklogCloudOk ? '☁️ 클라우드 동기화 ON' : '💾 로컬 저장 (SQL 설정 필요)')
+    ),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' } },
       tabs.map(t => /*#__PURE__*/React.createElement("button", {
         key: t.id, onClick: () => setTab(t.id),
@@ -16491,7 +16630,9 @@ function MyPage() {
     setApprovals,
     buyers,
     products,
-    schedules
+    schedules,
+    worklogs,
+    setWorklogs
   } = useAuth();
   const [curPw, setCurPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -16933,8 +17074,7 @@ function MyPage() {
           schedules: schedules || [],
           pricelist: pricelist || [],
           approvals: approvals || [],
-          pricelist: pricelist || [],
-          approvals: approvals || []
+          worklogs: worklogs || {}
         }
       };
       downloadBackup(backup);
@@ -16976,6 +17116,13 @@ function MyPage() {
             if (d.schedules) { setSchedules(d.schedules); if (syncDB.schedules) syncDB.schedules(d.schedules); }
             if (d.pricelist) setPricelist(d.pricelist);
             if (d.approvals) { setApprovals(d.approvals); if (syncDB.approvals) syncDB.approvals(d.approvals); }
+            if (d.worklogs) {
+              setWorklogs(d.worklogs);
+              for (const mod of Object.keys(WORKLOG_STATE_KEYS)) {
+                const sk = WORKLOG_STATE_KEYS[mod];
+                if (d.worklogs[sk]?.length && syncDB.worklogsModule) syncDB.worklogsModule(mod, d.worklogs[sk]);
+              }
+            }
             showToast('\u2705 \uBCF5\uC6D0 \uC644\uB8CC! ' + itemCount + '\uAC1C \uB370\uC774\uD130');
           } catch (err) {
             alert('\uBC31\uC5C5 \uD30C\uC77C \uC77D\uAE30 \uC2E4\uD328: ' + err.message);
