@@ -41,12 +41,17 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260708-fix');
+console.log('🚀 신화ERP v3 - 빌드: 20260708-stable');
 const normalizeImgUrl = url => {
   if (!url || !String(url).trim()) return '';
   let u = String(url).trim();
   if (u.startsWith('//')) u = 'https:' + u;
   return u;
+};
+const stripFormMeta = f => {
+  if (!f || typeof f !== 'object') return f;
+  const { filterType, ...rest } = f;
+  return rest;
 };
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
@@ -4268,12 +4273,16 @@ function ProductsPage() {
     if (form.id) {
       const upd = products.map(x => x.id === form.id ? p : x);
       setProducts(upd);
-      if (syncDB.product) syncDB.product(p);else syncDB.products(upd);
+      if (syncDB.product) {
+        syncDB.product(p).catch(() => showToast('⚠️ 클라우드 저장 실패 (로컬에는 저장됨)', '#ea580c'));
+      } else syncDB.products(upd);
       showToast('✅ 수정됐습니다!');
     } else {
       const upd = [...products, p];
       setProducts(upd);
-      if (syncDB.product) syncDB.product(p);else syncDB.products(upd);
+      if (syncDB.product) {
+        syncDB.product(p).catch(() => showToast('⚠️ 클라우드 저장 실패 (로컬에는 저장됨)', '#ea580c'));
+      } else syncDB.products(upd);
       showToast('✅ 상품 추가됐습니다!');
     }
     setModal(false);
@@ -7483,7 +7492,7 @@ function SalesPage() {
       const oldSale = sales.find(x => x.id === editTarget) || {};
       const updated2 = {
         ...oldSale,
-        ...form,
+        ...stripFormMeta(form),
         supply,
         vat,
         total: total2
@@ -7547,7 +7556,7 @@ function SalesPage() {
     } else {
       const entry = {
         id: Date.now(),
-        ...form,
+        ...stripFormMeta(form),
         supply,
         vat,
         total: total2,
@@ -7556,6 +7565,10 @@ function SalesPage() {
       };
       if (user.role === 'staff') {
         requestApproval('sales_add', '매출 등록: ' + form.partner, entry, user.name);
+        setModal(false);
+        setEditTarget(null);
+        showToast('✅ 결재 요청됐습니다');
+        return;
       } else {
         setSales(prev => [...prev, entry]);
         syncDB.sale(entry);
@@ -8170,17 +8183,6 @@ function SalesPage() {
       marginTop: 2
     }
   }, "\uC0C1\uD488 \uC120\uD0DD \uC2DC \uCD9C\uACE0 \uC7AC\uACE0 \uC790\uB3D9\uCC28\uAC10")), /*#__PURE__*/React.createElement(FG, {
-    label: "\uACFC\uC138\uBD84\uB958"
-  }, /*#__PURE__*/React.createElement(Sel, {
-    value: form.taxType,
-    onChange: v => setForm(f => ({
-      ...f,
-      taxType: v
-    }))
-  }, TAX_TYPES.map(t => /*#__PURE__*/React.createElement("option", {
-    key: t,
-    value: t
-  }, t)))), /*#__PURE__*/React.createElement(FG, {
     label: "\uACF5\uAE09\uAC00\uC561 *"
   }, /*#__PURE__*/React.createElement(Input, {
     value: form.supply,
@@ -8446,7 +8448,7 @@ function PurchasePage() {
       const oldPurchase = purchases.find(x => x.id === editTarget) || {};
       const updated = {
         ...oldPurchase,
-        ...form,
+        ...stripFormMeta(form),
         supply,
         vat,
         total: total2
@@ -8510,7 +8512,7 @@ function PurchasePage() {
     } else {
       const pEntry = {
         id: Date.now(),
-        ...form,
+        ...stripFormMeta(form),
         supply,
         vat,
         total: total2,
@@ -8520,6 +8522,8 @@ function PurchasePage() {
       if (user.role === 'staff') {
         requestApproval('purchase_add', '매입 등록: ' + form.partner, pEntry, user.name);
         setModal(false);
+        setEditTarget(null);
+        showToast('✅ 결재 요청됐습니다');
         return;
       }
       setPurchases(prev => [...prev, pEntry]);
@@ -8729,12 +8733,11 @@ function PurchasePage() {
       background: '#f8fafc',
       color: '#475569'
     }
-  }, b.l))), /*#__PURE__*/React.createElement(BuyerSelect, {
+  }, /*#__PURE__*/React.createElement(BuyerSelect, {
     value: searchText,
     onChange: v => setSearchText(v),
-    placeholder: "\uD83C\uDFE2 \uAC70\uB798\uCC98 \uC120\uD0DD \uB610\uB294 \uAC80\uC0C9"
-  ,
-    filterType: 'sales'
+    placeholder: "\uD83C\uDFE2 \uAC70\uB798\uCC98 \uC120\uD0DD \uB610\uB294 \uAC80\uC0C9",
+    filterType: 'purchase'
   }), /*#__PURE__*/React.createElement("input", {
     value: itemSearch || '',
     onChange: e => setItemSearch(e.target.value),
@@ -9524,6 +9527,8 @@ function PaymentPage() {
   const {
     payments,
     setPayments,
+    purchases,
+    setPurchases,
     showToast,
     canEdit,
     canApprove,
@@ -9608,9 +9613,14 @@ function PaymentPage() {
       if (syncDB.payment) syncDB.payment(p);
       // 지급 완료 시 매입 paid 자동 업데이트
       if (p.paid >= p.billed && p.billed > 0 && setPurchases) {
-        setPurchases(prev => (prev || []).map(s => 
-          s.partner === p.partner && !s.paid ? { ...s, paid: true } : s
-        ));
+        setPurchases(prev => (prev || []).map(s => {
+          if (s.partner === p.partner && !s.paid) {
+            const upd = { ...s, paid: true };
+            if (syncDB.purchase) syncDB.purchase(upd);
+            return upd;
+          }
+          return s;
+        }));
       }
     });
     showToast('✅ ' + importPayPreview.length + '건 지급 등록!');
