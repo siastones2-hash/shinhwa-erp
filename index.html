@@ -41,7 +41,13 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260619-open');
+console.log('🚀 신화ERP v3 - 빌드: 20260708-fix');
+const normalizeImgUrl = url => {
+  if (!url || !String(url).trim()) return '';
+  let u = String(url).trim();
+  if (u.startsWith('//')) u = 'https:' + u;
+  return u;
+};
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback,createContext=React.createContext,useContext=React.useContext;
 // ── Supabase 클라이언트 ──
 const SUPABASE_URL = "https://rfpsrldxnwucjfejvoxh.supabase.co";
@@ -2542,6 +2548,18 @@ function App() {
         console.error('sync products:', e);
       }
     },
+    product: async item => {
+      try {
+        await sb.upsert('erp_products', toDB.product(item));
+      } catch (e) {
+        console.error('sync product:', e);
+      }
+    },
+    delProduct: async id => {
+      try {
+        await sb.delete('erp_products', id);
+      } catch (e) { console.error(e); }
+    },
     buyers: async data => {
       try {
         await sb.replace('erp_buyers', data.map(toDB.buyer));
@@ -4238,6 +4256,7 @@ function ProductsPage() {
       ...form,
       id: newId,
       ko: (form.ko || '').trim(),
+      img: normalizeImgUrl(form.img),
       consumer: +form.consumer || 0,
       cost: +form.cost || 0,
       sale: +form.sale || 0,
@@ -4249,12 +4268,12 @@ function ProductsPage() {
     if (form.id) {
       const upd = products.map(x => x.id === form.id ? p : x);
       setProducts(upd);
-      syncDB.products(upd);
+      if (syncDB.product) syncDB.product(p);else syncDB.products(upd);
       showToast('✅ 수정됐습니다!');
     } else {
       const upd = [...products, p];
       setProducts(upd);
-      syncDB.products(upd);
+      if (syncDB.product) syncDB.product(p);else syncDB.products(upd);
       showToast('✅ 상품 추가됐습니다!');
     }
     setModal(false);
@@ -4278,7 +4297,7 @@ function ProductsPage() {
     }
     const upd = products.filter(x => x.id !== id);
     setProducts(upd);
-    syncDB.products(upd);
+    if (syncDB.delProduct) syncDB.delProduct(id);else syncDB.products(upd);
     showToast('🗑️ 상품 삭제됨');
   };
   const parseSHIExcel = rows => {
@@ -5314,8 +5333,9 @@ function ProductsPage() {
         width: 44
       }
     }, p.img ? /*#__PURE__*/React.createElement("img", {
-      src: p.img,
+      src: normalizeImgUrl(p.img),
       alt: p.ko,
+      referrerPolicy: "no-referrer",
       onError: e => {
         e.target.style.display = 'none';
       },
@@ -5650,8 +5670,9 @@ function ProductsPage() {
   })), form.img && /*#__PURE__*/React.createElement("div", {
     style: { marginTop: 4, marginBottom: 8 }
   }, /*#__PURE__*/React.createElement("img", {
-    src: form.img,
+    src: normalizeImgUrl(form.img),
     alt: "\uBBF8\uB9AC\uBCF4\uAE30",
+    referrerPolicy: "no-referrer",
     style: { maxWidth: 120, maxHeight: 120, border: '1px solid #e2e8f0', borderRadius: 6 },
     onError: e => { e.target.style.display = 'none'; }
   })), /*#__PURE__*/React.createElement(FG, {
@@ -6257,12 +6278,7 @@ function StockPage() {
       ...S.td,
       textAlign: 'center'
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontFamily: 'monospace',
-      color: '#94a3b8'
-    }
-  }, "0")), /*#__PURE__*/React.createElement("td", {
+  }, r.curStock != null ? r.curStock : 0), /*#__PURE__*/React.createElement("td", {
     style: {
       ...S.td,
       textAlign: 'center'
@@ -6636,9 +6652,7 @@ function StockPage() {
     onChange: v => setForm(f => ({
       ...f,
       partner: v
-    ,
-    filterType: 'purchase'
-  }))
+    }))
   }))), /*#__PURE__*/React.createElement(Full, null, /*#__PURE__*/React.createElement(FG, {
     label: "\uBE44\uACE0"
   }, /*#__PURE__*/React.createElement(Input, {
@@ -7070,8 +7084,9 @@ function ProductSelect({
   if (filterCat) preFiltered = preFiltered.filter(p => p.cat === filterCat);
   // 텍스트 검색 (한글명/영문명/브랜드/코드/바코드)
   const allFiltered = query ? preFiltered.filter(p => (p.ko || '').includes(query) || (p.en || '').toLowerCase().includes(query.toLowerCase()) || (p.brand || '').includes(query) || (p.id || '').toLowerCase().includes(query.toLowerCase()) || (p.barcode || '').includes(query)) : preFiltered;
-  // 검색어 있으면 매칭되는 모든 결과 (최대 500개), 검색어 없으면 100개
-  const filtered = query ? allFiltered.slice(0, 500) : allFiltered.slice(0, 100);
+  // 검색/필터 시 최대 2000개, 전체 목록은 상품 수만큼 표시
+  const listCap = query || filterBrand || filterCat ? 2000 : Math.max(activeProducts.length, 100);
+  const filtered = allFiltered.slice(0, listCap);
   const handleInput = v => {
     setQuery(v);
     onChange(v);
@@ -7160,7 +7175,15 @@ function ProductSelect({
       background: '#f8fafc',
       borderBottom: '1px solid #e2e8f0'
     }
-  }, (filterBrand || filterCat) ? '\uD83C\uDFF7\uFE0F ' + (filterBrand ? '브랜드[' + filterBrand + ']' : '') + (filterCat ? ' 카테고리[' + filterCat + ']' : '') + ' ' + preFiltered.length + '개' : '\uD83D\uDD0D 전체 ' + activeProducts.length + '개 중 상위 100개'), filtered.length > 0 && filtered.map(p => /*#__PURE__*/React.createElement("div", {
+  }, (filterBrand || filterCat) ? '\uD83C\uDFF7\uFE0F ' + (filterBrand ? '브랜드[' + filterBrand + ']' : '') + (filterCat ? ' 카테고리[' + filterCat + ']' : '') + ' ' + preFiltered.length + '개' : '\uD83D\uDD0D 전체 ' + activeProducts.length + '개'), filtered.length > 0 && filtered.length < allFiltered.length && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '6px 12px',
+      fontSize: 11,
+      color: '#ea580c',
+      background: '#fff7ed',
+      borderBottom: '1px solid #fed7aa'
+    }
+  }, filtered.length, '개 표시 (', allFiltered.length, '개 중)'), filtered.length > 0 && filtered.map(p => /*#__PURE__*/React.createElement("div", {
     key: p.id,
     onMouseDown: e => { e.preventDefault(); handleSelect(p); },
     style: {
@@ -7233,8 +7256,14 @@ function SalesPage() {
     requestApproval,
     user,
     syncDB,
-    pricelist
+    pricelist,
+    getStock
   } = useAuth();
+  const lookupPartnerPrice = (partner, productId, productKo) => {
+    if (!partner || !pricelist || !pricelist.length) return null;
+    const pl = pricelist.find(x => (x.buyer === partner || x.buyerId === partner) && (x.productId === productId || x.product === productKo));
+    return pl && pl.price ? pl.price : null;
+  };
   // 📤 매출 엑셀 일괄 등록
   const [importSalesModal, setImportSalesModal] = useState(false);
   const [importSalesPreview, setImportSalesPreview] = useState([]);
@@ -7406,7 +7435,7 @@ function SalesPage() {
     setForm(f => ({
       ...f,
       item: item || '',
-      // 직접 입력 시: 직전가 있으면 자동 입력, 없으면 기존값 유지
+      productId: '',
       supply: last && !f.supply ? String(last) : f.supply
     }));
   };
@@ -7415,10 +7444,8 @@ function SalesPage() {
       showToast('상품 정보가 올바르지 않습니다', '#dc2626');
       return;
     }
-    // 가격 우선순위: 직전가 > 거래처별 단가 > 판매가 > 소비자가 > 원가
     const last = getLastPrice(form.partner, p.ko);
-    const priceListPrice = form.partner ? 
-      (typeof getPartnerPrice === 'function' ? getPartnerPrice(form.partner, p.id) : null) : null;
+    const priceListPrice = form.partner ? lookupPartnerPrice(form.partner, p.id, p.ko) : null;
     const finalPrice = last || priceListPrice || p.sale || p.consumer || p.cost || '';
     setForm(f => ({
       ...f,
@@ -7742,6 +7769,36 @@ function SalesPage() {
   }, dateFrom || '?', " ~ ", dateTo || '?')), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
+      gap: 6,
+      marginBottom: 8,
+      flexWrap: 'wrap'
+    }
+  }, [{
+    l: '전체',
+    v: 'all'
+  }, {
+    l: '미수',
+    v: 'unpaid'
+  }, {
+    l: '수금완료',
+    v: 'paid'
+  }].map(chip => /*#__PURE__*/React.createElement("button", {
+    key: chip.v,
+    type: "button",
+    onClick: () => setCollectedFilter(chip.v),
+    style: {
+      padding: '4px 12px',
+      borderRadius: 16,
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: 'pointer',
+      border: '1.5px solid ' + (collectedFilter === chip.v ? '#2563eb' : '#e2e8f0'),
+      background: collectedFilter === chip.v ? '#eff6ff' : '#f8fafc',
+      color: collectedFilter === chip.v ? '#1d4ed8' : '#475569'
+    }
+  }, chip.l)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
       gap: 8,
       marginBottom: 12,
       flexWrap: 'wrap',
@@ -7755,9 +7812,8 @@ function SalesPage() {
   }, /*#__PURE__*/React.createElement(BuyerSelect, {
     value: searchText,
     onChange: v => setSearchText(v),
-    placeholder: "\uD83C\uDFE2 \uAC70\uB798\uCC98 \uC120\uD0DD \uB610\uB294 \uAC80\uC0C9"
-  ,
-    filterType: 'purchase'
+    placeholder: "\uD83C\uDFE2 \uAC70\uB798\uCC98 \uC120\uD0DD \uB610\uB294 \uAC80\uC0C9",
+    filterType: 'sales'
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       minWidth: 140,
@@ -8034,15 +8090,14 @@ function SalesPage() {
     label: "\uAC70\uB798\uCC98 *"
   }, /*#__PURE__*/React.createElement(BuyerSelect, {
     value: form.partner,
+    filterType: 'sales',
     onChange: v => {
       const b = buyers.find(x => x.name === v);
       setForm(f => ({
         ...f,
         partner: v,
         country: b ? b.country : f.country
-      ,
-    filterType: 'sales'
-  }));
+      }));
     }
   })), /*#__PURE__*/React.createElement(FG, {
     label: "\uAD6D\uAC00"
@@ -8922,12 +8977,11 @@ function PurchasePage() {
     label: "\uAC70\uB798\uCC98 *"
   }, /*#__PURE__*/React.createElement(BuyerSelect, {
     value: form.partner,
+    filterType: 'purchase',
     onChange: v => setForm(f => ({
       ...f,
       partner: v
-    ,
-    filterType: 'purchase'
-  }))
+    }))
   })), /*#__PURE__*/React.createElement(FG, {
     label: "\uACFC\uC138\uBD84\uB958"
   }, /*#__PURE__*/React.createElement(Sel, {
@@ -9228,7 +9282,14 @@ function ReceiptPage() {
       if (syncDB.receipt) syncDB.receipt(entry);
       // 매출 collected 업데이트
       if (received >= billed && billed > 0 && setSales) {
-        setSales(prev => (prev || []).map(s => s.partner === form.partner && !s.collected ? { ...s, collected: true } : s));
+        setSales(prev => (prev || []).map(s => {
+          if (s.partner === form.partner && !s.collected) {
+            const upd = { ...s, collected: true };
+            if (syncDB.sale) syncDB.sale(upd);
+            return upd;
+          }
+          return s;
+        }));
       }
       showToast('✅ 수금 등록!');
     }
@@ -9244,16 +9305,11 @@ function ReceiptPage() {
     if (setSales && r.partner) {
       setSales(prev => (prev || []).map(s => {
         if (s.partner === r.partner && s.collected === true) {
-          // 같은 거래처의 다른 수금이 더 있는지 확인 (취소 안 된 것)
-          const otherActiveReceipts = (receipts || []).filter(x => 
-            x.id !== r.id && 
-            x.partner === r.partner && 
-            x.status !== '취소' && 
-            (Number(x.received) || 0) > 0
-          );
-          // 다른 활성 수금이 없으면 collected 해제
+          const otherActiveReceipts = (receipts || []).filter(x => x.id !== r.id && x.partner === r.partner && x.status !== '취소' && (Number(x.received) || 0) > 0);
           if (otherActiveReceipts.length === 0) {
-            return { ...s, collected: false };
+            const upd = { ...s, collected: false };
+            if (syncDB.sale) syncDB.sale(upd);
+            return upd;
           }
         }
         return s;
@@ -9832,7 +9888,7 @@ function PaymentPage() {
     color: "outline",
     sm: true
   }, "\u2715 \uCD08\uAE30\uD654"))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
-    heads: ['날짜', '거래처', '품목', '지급예정', '지급액', '잔액', '상태', editable ? '관리' : ''].filter(Boolean),
+    heads: ['날짜', '거래처', '품목', '지급예정', '지급액', '잔액', '비고', '상태', editable ? '관리' : ''].filter(Boolean),
     rows: [...filteredPay].reverse().map((r, i) => {
       const rem = (r.billed || 0) - (r.paid || 0);
       const done = rem <= 0;
@@ -9866,6 +9922,17 @@ function PaymentPage() {
           color: rem > 0 ? '#dc2626' : '#15803d'
         }
       }, won(rem)), /*#__PURE__*/React.createElement("td", {
+        style: {
+          ...S.td,
+          fontSize: 11,
+          color: '#64748b',
+          maxWidth: 160,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        },
+        title: r.note || ''
+      }, r.note || '—'), /*#__PURE__*/React.createElement("td", {
         style: S.td
       }, /*#__PURE__*/React.createElement(Tag, {
         c: done ? 'green' : 'orange'
@@ -13767,7 +13834,7 @@ function QuotePage() {
           en: p.en || '',
           sp: p.sp || '',
           brand: p.brand || '',
-          img: p.img || '',
+          img: normalizeImgUrl(p.img || ''),
           qty: 1,
           unitPrice,
           cost: p.cost || 0,
