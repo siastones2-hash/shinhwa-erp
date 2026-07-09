@@ -41,11 +41,16 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260709-fix2');
+console.log('🚀 신화ERP v3 - 빌드: 20260709-fix3');
 const normalizeImgUrl = url => {
   if (!url || !String(url).trim()) return '';
   let u = String(url).trim();
   if (u.startsWith('//')) u = 'https:' + u;
+  // Google Drive 공유 링크 → 직접 표시 URL
+  const fileId = (u.match(/drive\.google\.com\/file\/d\/([^/?#]+)/) || u.match(/[?&]id=([^&/#]+)/) || [])[1];
+  if (fileId && u.includes('drive.google.com')) {
+    return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800';
+  }
   return u;
 };
 const stripFormMeta = f => {
@@ -5842,8 +5847,16 @@ function StockPage() {
   });
   const [bulkRows, setBulkRows] = useState([]);
   const [bulkSearch, setBulkSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [editingStockId, setEditingStockId] = useState(null);
   const editable = canEdit('stock');
+  const inStockPeriod = d => {
+    if (!d) return true;
+    if (dateFrom && d < dateFrom) return false;
+    if (dateTo && d > dateTo) return false;
+    return true;
+  };
   const initBulkRows = () => {
     // 전체 상품 (사용 안 함 제외, 최근 등록순)
     const allProducts = products
@@ -5956,15 +5969,17 @@ function StockPage() {
   const stockRows = products.map(p => {
     const cur = getStock(p.id);
     const status = cur <= 0 ? '재고없음' : cur <= (p.safe || 0) ? '부족' : '정상';
+    const periodStocks = stocks.filter(s => s.productId === p.id && inStockPeriod(s.date));
     return {
       p,
       cur,
       status,
       c: status === '재고없음' ? 'red' : status === '부족' ? 'orange' : 'green',
-      tin: stocks.filter(s => s.productId === p.id && s.type === 'in').reduce((a, s) => a + s.qty, 0),
-      tout: stocks.filter(s => s.productId === p.id && s.type === 'out').reduce((a, s) => a + s.qty, 0)
+      tin: periodStocks.filter(s => s.type === 'in').reduce((a, s) => a + s.qty, 0),
+      tout: periodStocks.filter(s => s.type === 'out').reduce((a, s) => a + s.qty, 0)
     };
   });
+  const filteredStockHistory = [...stocks].filter(s => inStockPeriod(s.date)).reverse();
   const [stockDetail, setStockDetail] = useState(null);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6035,7 +6050,90 @@ function StockPage() {
       showToast('✅ 엑셀 다운로드!');
     },
     color: "outline"
-  }, "\uD83D\uDCE5 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC"))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(CardHead, {
+  }, "\uD83D\uDCE5 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6,
+      marginBottom: 10,
+      flexWrap: 'wrap',
+      alignItems: 'center'
+    }
+  }, [{
+    l: '오늘',
+    fn: () => {
+      const t = todayStr();
+      setDateFrom(t);
+      setDateTo(t);
+    }
+  }, {
+    l: '이번달',
+    fn: () => {
+      const n = new Date();
+      setDateFrom(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-01`);
+      setDateTo(todayStr());
+    }
+  }, {
+    l: '지난달',
+    fn: () => {
+      const n = new Date();
+      const lm = new Date(n.getFullYear(), n.getMonth() - 1, 1);
+      const le = new Date(n.getFullYear(), n.getMonth(), 0);
+      setDateFrom(lm.toISOString().slice(0, 10));
+      setDateTo(le.toISOString().slice(0, 10));
+    }
+  }, {
+    l: '올해',
+    fn: () => {
+      setDateFrom(`${new Date().getFullYear()}-01-01`);
+      setDateTo(todayStr());
+    }
+  }, {
+    l: '전체',
+    fn: () => {
+      setDateFrom('');
+      setDateTo('');
+    }
+  }].map(b => /*#__PURE__*/React.createElement("button", {
+    key: b.l,
+    onClick: b.fn,
+    style: {
+      padding: '4px 10px',
+      borderRadius: 16,
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: 'pointer',
+      border: '1.5px solid #e2e8f0',
+      background: '#f8fafc',
+      color: '#475569'
+    }
+  }, b.l)), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: dateFrom,
+    onChange: e => setDateFrom(e.target.value),
+    style: {
+      ...inp2style,
+      width: 130
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: '#94a3b8'
+    }
+  }, "~"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: dateTo,
+    onChange: e => setDateTo(e.target.value),
+    style: {
+      ...inp2style,
+      width: 130
+    }
+  }), (dateFrom || dateTo) && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: '#1d4ed8',
+      fontWeight: 600
+    }
+  }, dateFrom || '?', " ~ ", dateTo || '?')), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(CardHead, {
     left: "\uC7AC\uACE0 \uD604\uD669",
     right: /*#__PURE__*/React.createElement("span", {
       style: {
@@ -6107,11 +6205,11 @@ function StockPage() {
       }
     }, tout)))
   })), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(CardHead, {
-    left: "\uC785\uCD9C\uACE0 \uC774\uB825 (\uCD5C\uADFC 20\uAC74)"
+    left: (dateFrom || dateTo) ? `\uC785\uCD9C\uACE0 \uC774\uB825 (${filteredStockHistory.length}\uAC74)` : "\uC785\uCD9C\uACE0 \uC774\uB825 (\uCD5C\uADFC 20\uAC74)"
   }), /*#__PURE__*/React.createElement(Tbl, {
     heads: ['날짜', '구분', '상품', '수량', '단가', '거래처', '문서'],
     empty: "\uC785\uCD9C\uACE0 \uB0B4\uC5ED\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
-    rows: [...stocks].reverse().slice(0, 20).map((s, i) => {
+    rows: (dateFrom || dateTo ? filteredStockHistory : filteredStockHistory.slice(0, 20)).map((s, i) => {
       const p = products.find(x => x.id === s.productId);
       return /*#__PURE__*/React.createElement("tr", {
         key: s.id,
@@ -8819,12 +8917,12 @@ function PurchasePage() {
     }
   }, s.v)))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(Tbl, {
     heads: ['날짜', '거래처', '품목', '공급가', '부가세', '합계', '과세', '상태', editable ? '관리' : ''].filter(Boolean),
-    empty: "\uB9E4\uCD9C \uB0B4\uC5ED\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uB9E4\uCD9C\uC744 \uB4F1\uB85D\uD574\uBCF4\uC138\uC694!",
+    empty: "\uB9E4\uC785 \uB0B4\uC5ED\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uB9E4\uC785\uC744 \uB4F1\uB85D\uD574\uBCF4\uC138\uC694!",
     rows: [...filtered].reverse().map((s, i) => /*#__PURE__*/React.createElement("tr", {
       key: s.id,
       style: {
-        background: Math.max(0, (r.billed || 0) - (r.received || 0)) > 0 ? '#fef2f2' : i % 2 ? '#fafbff' : '#fff',
-        borderLeft: Math.max(0, (r.billed || 0) - (r.received || 0)) > 0 ? '3px solid #dc2626' : '3px solid #16a34a'
+        background: s.status === '취소' ? '#f9fafb' : !s.paid && (s.total || 0) > 0 ? '#fffbeb' : s.paid ? '#f0fdf4' : i % 2 ? '#fafbff' : '#fff',
+        borderLeft: s.status === '취소' ? '3px solid #e2e8f0' : !s.paid && (s.total || 0) > 0 ? '3px solid #f59e0b' : s.paid ? '3px solid #16a34a' : 'none'
       }
     }, /*#__PURE__*/React.createElement("td", {
       style: S.td
@@ -9086,6 +9184,7 @@ function ReceiptPage() {
     user,
     requestApproval = () => {},
     buyers = [],
+    products = [],
     receiptFilter,
     setReceiptFilter = () => {}
   } = ctx;
@@ -9495,7 +9594,12 @@ function ReceiptPage() {
           /*#__PURE__*/React.createElement("option", { value: '' }, '거래처 선택'),
           (buyers || []).map(b => /*#__PURE__*/React.createElement("option", { key: b.id, value: b.name }, b.name)))),
       /*#__PURE__*/React.createElement(FG, { label: '품목' },
-        /*#__PURE__*/React.createElement(Input, { value: form.item, onChange: v => setForm(f => ({ ...f, item: v })), placeholder: '품목명' })),
+        /*#__PURE__*/React.createElement(ProductSelect, {
+          value: form.item,
+          onChange: v => setForm(f => ({ ...f, item: v })),
+          onSelect: p => setForm(f => ({ ...f, item: p.ko || '', productId: p.id })),
+          placeholder: '품목 검색...'
+        })),
       /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } },
         /*#__PURE__*/React.createElement(FG, { label: '청구액' },
           /*#__PURE__*/React.createElement(Input, { type: 'number', value: form.billed, onChange: v => setForm(f => ({ ...f, billed: v })), placeholder: '0' })),
