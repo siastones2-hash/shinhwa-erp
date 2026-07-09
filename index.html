@@ -41,7 +41,7 @@ input, select, textarea, button { font-family: inherit; font-size: 16px; }
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
-console.log('🚀 신화ERP v3 - 빌드: 20260708-stable');
+console.log('🚀 신화ERP v3 - 빌드: 20260709-fix2');
 const normalizeImgUrl = url => {
   if (!url || !String(url).trim()) return '';
   let u = String(url).trim();
@@ -7184,15 +7184,7 @@ function ProductSelect({
       background: '#f8fafc',
       borderBottom: '1px solid #e2e8f0'
     }
-  }, (filterBrand || filterCat) ? '\uD83C\uDFF7\uFE0F ' + (filterBrand ? '브랜드[' + filterBrand + ']' : '') + (filterCat ? ' 카테고리[' + filterCat + ']' : '') + ' ' + preFiltered.length + '개' : '\uD83D\uDD0D 전체 ' + activeProducts.length + '개'), filtered.length > 0 && filtered.length < allFiltered.length && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '6px 12px',
-      fontSize: 11,
-      color: '#ea580c',
-      background: '#fff7ed',
-      borderBottom: '1px solid #fed7aa'
-    }
-  }, filtered.length, '개 표시 (', allFiltered.length, '개 중)'), filtered.length > 0 && filtered.map(p => /*#__PURE__*/React.createElement("div", {
+  }, (filterBrand || filterCat) ? '\uD83C\uDFF7\uFE0F ' + (filterBrand ? '브랜드[' + filterBrand + ']' : '') + (filterCat ? ' 카테고리[' + filterCat + ']' : '') + ' ' + preFiltered.length + '개' : '\uD83D\uDD0D 전체 ' + activeProducts.length + '개' + (allFiltered.length > listCap ? ' · 상위 ' + listCap + '개' : '')), filtered.length > 0 && filtered.map(p => /*#__PURE__*/React.createElement("div", {
     key: p.id,
     onMouseDown: e => { e.preventDefault(); handleSelect(p); },
     style: {
@@ -7795,21 +7787,25 @@ function SalesPage() {
   }, {
     l: '수금완료',
     v: 'paid'
-  }].map(chip => /*#__PURE__*/React.createElement("button", {
-    key: chip.v,
-    type: "button",
-    onClick: () => setCollectedFilter(chip.v),
-    style: {
-      padding: '4px 12px',
-      borderRadius: 16,
-      fontSize: 11,
-      fontWeight: 600,
-      cursor: 'pointer',
-      border: '1.5px solid ' + (collectedFilter === chip.v ? '#2563eb' : '#e2e8f0'),
-      background: collectedFilter === chip.v ? '#eff6ff' : '#f8fafc',
-      color: collectedFilter === chip.v ? '#1d4ed8' : '#475569'
-    }
-  }, chip.l)), /*#__PURE__*/React.createElement("div", {
+  }].map(function (chip) {
+    return /*#__PURE__*/React.createElement("button", {
+      key: chip.v,
+      type: "button",
+      onClick: function () {
+        setCollectedFilter(chip.v);
+      },
+      style: {
+        padding: '4px 12px',
+        borderRadius: 16,
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: 'pointer',
+        border: '1.5px solid ' + (collectedFilter === chip.v ? '#2563eb' : '#e2e8f0'),
+        background: collectedFilter === chip.v ? '#eff6ff' : '#f8fafc',
+        color: collectedFilter === chip.v ? '#1d4ed8' : '#475569'
+      }
+    }, chip.l);
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -8733,7 +8729,7 @@ function PurchasePage() {
       background: '#f8fafc',
       color: '#475569'
     }
-  }, /*#__PURE__*/React.createElement(BuyerSelect, {
+  }, b.l))), /*#__PURE__*/React.createElement(BuyerSelect, {
     value: searchText,
     onChange: v => setSearchText(v),
     placeholder: "\uD83C\uDFE2 \uAC70\uB798\uCC98 \uC120\uD0DD \uB610\uB294 \uAC80\uC0C9",
